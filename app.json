@@ -7,18 +7,28 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pritambhingole.loviq",
+      "infoPlist": {
+        "NSUserNotificationUsageDescription": "Notifications help you receive new matches and messages."
+      }
     },
     "android": {
+      "package": "com.pritambhingole.loviq",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundImage": "./assets/android-icon-background.png"
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "web": {},
+    "extra": {
+      "eas": {
+        "projectId": "36b1028c-ce2e-43c5-b2fc-3a1f4fc0a794"
+      }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

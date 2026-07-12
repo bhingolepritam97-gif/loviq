@@ -1,0 +1,19 @@
+# Optional: local Postgres+PostGIS for development if you don't want to hit
+# Neon while iterating. Not required in production — Neon's free tier is the
+# recommended target (see .env.example). Run: docker compose up -d
+version: "3.8"
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: loviq
+      POSTGRES_PASSWORD: loviq_dev_password
+      POSTGRES_DB: loviq
+    ports:
+      - "5432:5432"
+    volumes:
+      - loviq_pg_data:/var/lib/postgresql/data
+
+volumes:
+  loviq_pg_data:

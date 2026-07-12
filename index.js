@@ -1,4 +1,17 @@
+import 'react-native-gesture-handler';
+import 'react-native-reanimated';
 import { registerRootComponent } from 'expo';
+import { Alert } from 'react-native';
+
+const defaultErrorHandler = ErrorUtils.getGlobalHandler();
+ErrorUtils.setGlobalHandler((error, isFatal) => {
+  Alert.alert(
+    'JS Crash Detected',
+    `Fatal: ${isFatal}\n\nError: ${error.name}: ${error.message}`,
+    [{ text: 'OK' }]
+  );
+  // We purposely do not call defaultErrorHandler to keep the app open and show the alert
+});
 
 import App from './App';
 
