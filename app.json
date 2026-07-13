@@ -1,34 +1,43 @@
 {
   "expo": {
-    "name": "loviq",
+    "name": "Vela",
     "slug": "loviq",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D0D1A"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.pritambhingole.loviq",
+      "bundleIdentifier": "com.pritambhingole.vela",
       "infoPlist": {
         "NSUserNotificationUsageDescription": "Notifications help you receive new matches and messages."
       }
     },
     "android": {
-      "package": "com.pritambhingole.loviq",
+      "package": "com.pritambhingole.vela",
+      "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0D0D1A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png"
       }
     },
     "web": {},
+    "plugins": [
+      "expo-secure-store",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
+    ],
     "extra": {
       "eas": {
-        "projectId": "36b1028c-ce2e-43c5-b2fc-3a1f4fc0a794"
+        "projectId": "20274978-9acb-40b8-94d5-7c20b3a3ba34"
       }
-    },
-    "plugins": [
-      "expo-secure-store"
-    ]
+    }
   }
 }

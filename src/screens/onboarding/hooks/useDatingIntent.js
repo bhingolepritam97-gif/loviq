@@ -8,19 +8,20 @@ try {
 }
 
 export function useDatingIntent(route, navigation) {
-  const { name, birthday, age, gender, showGender } = route.params || {
+  const { name, birthday, age, gender, showGender, interestedIn = [] } = route.params || {
     name: 'User',
     birthday: '',
     age: 18,
     gender: '',
     showGender: true,
+    interestedIn: [],
   };
 
   const [selectedIntent, setSelectedIntent] = useState('');
 
   const triggerHaptic = () => {
     if (Haptics && Haptics.impactAsync) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch((err) => console.log('Haptics error:', err));
     }
   };
 
@@ -37,14 +38,15 @@ export function useDatingIntent(route, navigation) {
         age,
         gender,
         showGender,
+        interestedIn,
         intent: selectedIntent,
       });
     }
   };
 
   const selectedCount = selectedIntent ? 1 : 0;
-  const percentComplete = selectedIntent ? 33 : 0;
-  const remainingCount = selectedIntent ? 2 : 3;
+  const percentComplete = selectedIntent ? 100 : 0;
+  const remainingCount = selectedIntent ? 0 : 1;
 
   return {
     selectedIntent,

@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 import { auth } from '../config/firebase';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://loviq-api.onrender.com'; // Match API client
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://vela-api.onrender.com'; // Match API client
 
 
 class SocketService {

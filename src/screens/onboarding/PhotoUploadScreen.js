@@ -20,7 +20,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { Colors, Typography, Spacing, Radius } from '../../theme';
+import { Colors, Shadow, Typography, Spacing, Radius } from '../../theme';
 import OnboardingHeader from '../../components/OnboardingHeader';
 import PhotoGrid from '../../components/PhotoGrid';
 import StickyFooter from '../../components/StickyFooter';
@@ -135,7 +135,7 @@ export default function PhotoUploadScreen({ route, navigation }) {
     if (photos.length <= 2) {
       Alert.alert(
         'Minimum Photos Required',
-        'To build a genuine dating profile and unlock matches, Loviq requires at least 2 photos.',
+        'To build a genuine dating profile and unlock matches, Vela requires at least 2 photos.',
         [{ text: 'OK' }]
       );
       return;
@@ -151,8 +151,7 @@ export default function PhotoUploadScreen({ route, navigation }) {
         currentStep={11}
         totalSteps={12}
         title="Build Profile"
-        subtitle="Step 6 of 6"
-      />
+        />
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.contentContainer}>

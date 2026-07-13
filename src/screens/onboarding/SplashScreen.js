@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Typography, Gradients, Spacing } from '../../theme';;
+import { View, Text, StyleSheet, Animated, Dimensions, Image } from 'react-native';
+import { Colors, Typography, Spacing } from '../../theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,22 +25,24 @@ export default function SplashScreen({ navigation }) {
   }, []);
 
   return (
-    <LinearGradient colors={Gradients.primary.colors} start={Gradients.primary.start} end={{ x: 1, y: 1 }} style={styles.container}>
+    <View style={styles.container}>
       <Animated.View style={[styles.logoWrap, { transform: [{ scale }], opacity }]}>
-        <Text style={styles.logoIcon}>💜</Text>
-        <Text style={styles.logoText}>Loviq</Text>
+        <Image
+          source={require('../../../assets/icon.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
       </Animated.View>
       <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>
-        Find your forever ✨
+        Find your way to someone ✨
       </Animated.Text>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  logoWrap: { alignItems: 'center' },
-  logoIcon: { fontSize: 72, marginBottom: Spacing.sm },
-  logoText: { fontSize: 52, fontWeight: '800', color: Colors.white, letterSpacing: -1.5 },
-  tagline: { fontSize: Typography.fontSize.lg, color: 'rgba(255,255,255,0.85)', marginTop: Spacing.base, letterSpacing: 0.3 },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0D0D1A' },
+  logoWrap: { alignItems: 'center', justifyContent: 'center', width: width * 0.7, aspectRatio: 1 },
+  logoImage: { width: '100%', height: '100%' },
+  tagline: { fontSize: Typography.fontSize.md, color: 'rgba(255,255,255,0.7)', marginTop: Spacing.base, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: '600' },
 });

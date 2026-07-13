@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../../theme';
 import Input from '../../components/Input';
 import { useAuth } from '../../context/AuthContext';
+import { updateUserProfile } from '../../services/UserService';
+import { Alert } from 'react-native';
 
 export default function EditProfileScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { profile, setProfile } = useAuth();
+  const { profile, setProfile, user } = useAuth();
   
   // Local state for profile inputs
   const [name, setName] = useState(profile?.name || '');
   const [bio, setBio] = useState(profile?.bio || '');
   const [job, setJob] = useState(profile?.job || 'Product Designer');
   const [school, setSchool] = useState(profile?.school || 'NYU');
+  const [intent, setIntent] = useState(profile?.intent || 'Long-term');
   
   // Listen to updates from ManagePhotos and ManagePrompts screens
   const [photos, setPhotos] = useState(profile?.photos || []);
@@ -30,19 +34,33 @@ export default function EditProfileScreen({ navigation, route }) {
     return unsubscribe;
   }, [navigation, profile]);
 
-  const handleSave = () => {
-    if (profile) {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!profile || !user) return;
+    setSaving(true);
+    const updatedData = {
+      name,
+      bio,
+      job,
+      school,
+      intent,
+      photos,
+      prompts
+    };
+    try {
+      await updateUserProfile(user.uid, updatedData);
       setProfile({
         ...profile,
-        name,
-        bio,
-        job,
-        school,
-        photos,
-        prompts
+        ...updatedData
       });
+      navigation.goBack();
+    } catch (err) {
+      console.error('Error saving profile:', err);
+      Alert.alert('Error', 'Failed to save profile settings. Please check your connection.');
+    } finally {
+      setSaving(false);
     }
-    navigation.goBack();
   };
 
   return (
@@ -50,11 +68,15 @@ export default function EditProfileScreen({ navigation, route }) {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <Text style={styles.backArrow}>←</Text>
+          <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Edit Profile</Text>
-        <TouchableOpacity onPress={handleSave} style={styles.saveBtn}>
-          <Text style={styles.saveText}>Save</Text>
+        <TouchableOpacity onPress={handleSave} style={styles.saveBtn} disabled={saving}>
+          {saving ? (
+            <ActivityIndicator size="small" color={Colors.primary} />
+          ) : (
+            <Text style={styles.saveText}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -172,6 +194,27 @@ export default function EditProfileScreen({ navigation, route }) {
           />
         </View>
 
+        {/* SECTION: DATING INTENT */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionEmoji}>🎯</Text>
+              <Text style={styles.sectionTitle}>DATING INTENT</Text>
+            </View>
+          </View>
+          <View style={styles.intentGrid}>
+            {['Long-term', 'Long-term, open to short', 'Short-term, open to long', 'Short-term', 'New friends', 'Still figuring it out'].map((item) => (
+              <TouchableOpacity
+                key={item}
+                style={[styles.intentPill, intent === item && styles.intentPillActive]}
+                onPress={() => setIntent(item)}
+              >
+                <Text style={[styles.intentText, intent === item && styles.intentTextActive]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
       </ScrollView>
     </View>
   );
@@ -179,16 +222,15 @@ export default function EditProfileScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, height: 60, borderBottomWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, height: 60, backgroundColor: Colors.surface, zIndex: 10, ...Shadow.sm },
   headerBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  backArrow: { fontSize: 24, fontWeight: '800', color: Colors.text },
   title: { fontSize: Typography.fontSize.lg, fontWeight: '800', color: Colors.text, letterSpacing: -0.5 },
-  saveBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, backgroundColor: Colors.primary, borderRadius: Radius.full, ...Shadow.sm },
-  saveText: { fontSize: Typography.fontSize.sm, color: Colors.white, fontWeight: '700' },
+  saveBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
+  saveText: { fontSize: Typography.fontSize.base, color: Colors.primary, fontWeight: '800' },
   
   scroll: { padding: Spacing.xl, gap: Spacing.lg, paddingBottom: 80 },
   
-  sectionCard: { backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.xl, borderHorizontalWidth: 1, borderColor: Colors.border, ...Shadow.sm },
+  sectionCard: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: Spacing.xl, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   sectionEmoji: { fontSize: 18 },
@@ -206,9 +248,15 @@ const styles = StyleSheet.create({
   emptyPromptsBox: { padding: Spacing.md, borderStyle: 'dashed', borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.lg, alignItems: 'center' },
   emptyPromptsText: { fontSize: 13, color: Colors.textMuted, textAlign: 'center', lineHeight: 18 },
   promptsPreviewList: { gap: Spacing.md },
-  promptPreviewItem: { backgroundColor: Colors.background, padding: Spacing.md, borderRadius: Radius.lg, borderHorizontalWidth: 1, borderColor: Colors.border },
+  promptPreviewItem: { backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border },
   promptQuestionPreview: { fontSize: 12, fontWeight: '800', color: Colors.primary, uppercase: true, letterSpacing: 0.5, marginBottom: Spacing.xs },
   promptReplyPreview: { fontSize: 14, color: Colors.text, fontStyle: 'italic', lineHeight: 20 },
 
   infoInput: { marginBottom: Spacing.md },
+
+  intentGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  intentPill: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
+  intentPillActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '12' },
+  intentText: { fontSize: 13, color: Colors.text, fontWeight: '600' },
+  intentTextActive: { color: Colors.primary, fontWeight: '700' },
 });

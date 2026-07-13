@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Radius, Typography, Spacing } from '../theme';
+import { Colors, Shadow, Radius, Typography, Spacing } from '../theme';
 
 export default function QualityBadge({ passed }) {
   return (

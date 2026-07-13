@@ -5,25 +5,49 @@ import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../th
 import { LinearGradient } from 'expo-linear-gradient';
 import { PREMIUM_FEATURES } from '../../data/constants';
 import { useAuth } from '../../context/AuthContext';
+import { upgradeToPremium } from '../../services/UserService';
 
-const { width } = Dimensions.get('window');
+const MOCK_PACKAGES = [
+  { id: '1_mo', title: '1 Month', priceString: '$14.99', description: '$14.99/mo', isPopular: false },
+  { id: '6_mo', title: '6 Months', priceString: '$49.99', description: '$8.33/mo', isPopular: true },
+  { id: '12_mo', title: '12 Months', priceString: '$79.99', description: '$6.66/mo', isPopular: false }
+];
 
 export default function PremiumScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [selectedPlanIdx, setSelectedPlanIdx] = useState(0);
+  const [selectedPlanIdx, setSelectedPlanIdx] = useState(1);
+  const [packages, setPackages] = useState(MOCK_PACKAGES);
+  const [purchasing, setPurchasing] = useState(false);
 
   const { user, profile, setProfile } = useAuth();
 
-  const handleSubscribe = () => {
-    // In a real app, you would process payment via IAP here.
-    if (profile) {
-      setProfile({ ...profile, isPremium: true });
+  const handleSubscribe = async () => {
+    if (!user) return;
+    
+    setPurchasing(true);
+    try {
+      // Mock network delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      const success = await upgradeToPremium(user.uid);
+      
+      if (success) {
+        if (profile) {
+          setProfile({ ...profile, isPremium: true });
+        }
+        Alert.alert(
+          "👑 Welcome to Vela Gold!",
+          "Success! You now have access to See Who Likes You, Unlimited Swipes, and exclusive premium profiles."
+        );
+        navigation.goBack();
+      } else {
+        Alert.alert("Error", "Could not process your upgrade at this time.");
+      }
+    } catch (e) {
+      Alert.alert("Error purchasing package", e.message);
+    } finally {
+      setPurchasing(false);
     }
-    Alert.alert(
-      "👑 Welcome to Loviq Gold!",
-      "Success! You now have access to unlimited likes, rewinds, and exclusive premium profiles."
-    );
-    navigation.goBack();
   };
 
   return (
@@ -40,7 +64,7 @@ export default function PremiumScreen({ navigation }) {
             <Text style={styles.closeText}>✕</Text>
           </TouchableOpacity>
           <Text style={styles.heroEmoji}>👑</Text>
-          <Text style={styles.heroTitle}>Loviq Gold</Text>
+          <Text style={styles.heroTitle}>Vela Gold</Text>
           <Text style={styles.heroSubtitle}>Unlock all premium features to upgrade your dating life.</Text>
         </LinearGradient>
 
@@ -48,24 +72,20 @@ export default function PremiumScreen({ navigation }) {
           {/* Plans */}
           <Text style={styles.sectionTitle}>Choose a Plan</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.plansRow}>
-            {[
-              { duration: '12 Months', price: '$4.99/mo', total: '$59.88', popular: true },
-              { duration: '6 Months', price: '$7.99/mo', total: '$47.94', popular: false },
-              { duration: '1 Month', price: '$12.99/mo', total: '$12.99', popular: false },
-            ].map((plan, idx) => (
+            {packages.map((pkg, idx) => (
               <TouchableOpacity
                 key={idx}
                 style={[styles.planCard, selectedPlanIdx === idx && styles.planCardActive]}
                 onPress={() => setSelectedPlanIdx(idx)}
               >
-                {plan.popular && (
+                {pkg.packageType === 'ANNUAL' && (
                   <View style={styles.popularBadge}>
-                    <Text style={styles.popularText}>MOST POPULAR</Text>
+                    <Text style={styles.popularText}>BEST VALUE</Text>
                   </View>
                 )}
-                <Text style={styles.durationText}>{plan.duration}</Text>
-                <Text style={styles.priceText}>{plan.price}</Text>
-                <Text style={styles.totalText}>Total: {plan.total}</Text>
+                <Text style={styles.durationText}>{pkg.product.title}</Text>
+                <Text style={styles.priceText}>{pkg.product.priceString}</Text>
+                <Text style={styles.totalText}>{pkg.product.description}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -95,7 +115,7 @@ export default function PremiumScreen({ navigation }) {
             end={Gradients.gold.end}
             style={styles.subBtnGradient}
           >
-            <Text style={styles.subBtnText}>Continue with Gold</Text>
+            <Text style={styles.subBtnText}>{purchasing ? "Processing..." : "Continue with Gold"}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>

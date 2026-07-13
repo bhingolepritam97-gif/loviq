@@ -3,7 +3,7 @@ import { View, Text } from 'react-native';
 import styles from '../styles/datingIntent.styles';
 import { Colors } from '../../../theme';
 
-export default function ProfileProgress({ selectedCount, percentComplete, remainingCount }) {
+export default function ProfileProgress({ selectedCount, percentComplete, remainingCount, totalRequired = 3 }) {
   const getRingStyle = () => {
     if (percentComplete > 0) {
       return {
@@ -27,7 +27,7 @@ export default function ProfileProgress({ selectedCount, percentComplete, remain
 
         <View style={styles.progressStats}>
           <Text style={styles.statsTitle}>
-            {selectedCount} of 3 Selected
+            {selectedCount} of {totalRequired} Selected
           </Text>
           <Text style={styles.statsSubtitle}>
             {remainingCount > 0

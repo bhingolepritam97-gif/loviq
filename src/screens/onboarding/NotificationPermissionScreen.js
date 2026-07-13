@@ -2,14 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography, Spacing, Radius, Gradients } from '../../theme';
+import { Colors, Shadow, Typography, Spacing, Radius, Gradients } from '../../theme';
 import Button from '../../components/Button';
 import OnboardingHeader from '../../components/OnboardingHeader';
 import { useAuth } from '../../context/AuthContext';
 import { createUserProfile } from '../../services/UserService';
+import Constants from 'expo-constants';
 
 export default function NotificationPermissionScreen({ route, navigation }) {
-  const { name, birthday, age, gender, showGender, interestedIn, intent, interests, bio, photos } = route.params || { name: 'User', birthday: '', age: 18, gender: '', showGender: true, interestedIn: [], intent: '', interests: [], bio: '', photos: [] };
+  const { name, birthday, age, gender, showGender, interestedIn, intent, interests, bio, photos, location } = route.params || {};
   const insets = useSafeAreaInsets();
   const scale = useRef(new Animated.Value(0.5)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -17,38 +18,56 @@ export default function NotificationPermissionScreen({ route, navigation }) {
 
   const { user, setProfile } = useAuth();
 
+  const handleEnableNotifications = async () => {
+    try {
+      const isExpoGo = Constants.appOwnership === 'expo';
+      if (isExpoGo) {
+        console.log('[NotificationPermissionScreen] Skipping notifications in Expo Go.');
+        await handleFinish();
+        return;
+      }
+
+      const Notifications = require('expo-notifications');
+      const { status } = await Notifications.requestPermissionsAsync();
+      await handleFinish();
+    } catch (e) {
+      console.warn('Failed to request notification permission:', e);
+      await handleFinish();
+    }
+  };
+
   const handleFinish = async () => {
     setLoading(true);
     const profileData = {
-      name,
-      birthday,
-      age,
-      gender,
-      showGender,
-      interestedIn,
-      intent,
-      interests,
-      bio,
-      photos,
+      name, birthday, age, gender, showGender,
+      interestedIn, intent, interests, bio, photos, location,
       profileComplete: true
     };
 
-    console.log('🎉 ONBOARDING COMPLETED PROFILE:', profileData);
-    
     if (user) {
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        await AsyncStorage.setItem(`profileComplete_${user.uid}`, 'true');
+      } catch (err) {
+        console.warn('Failed to save profileComplete locally:', err);
+      }
+
       try {
         await createUserProfile(user.uid, profileData);
         setProfile(profileData);
-        // AppNavigator will switch to Main automatically
       } catch (err) {
-        console.error('Failed to save profile:', err);
-        navigation.replace('Main');
+        console.warn('Failed to save profile to Firestore:', err);
+        setProfile(profileData);
       } finally {
         setLoading(false);
       }
     } else {
       setLoading(false);
-      navigation.replace('Main');
+      setProfile(profileData);
+      navigation.getParent()?.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      });
     }
   };
 
@@ -65,11 +84,10 @@ export default function NotificationPermissionScreen({ route, navigation }) {
 
       <OnboardingHeader
         onBack={() => navigation.goBack()}
-        currentStep={12}
-        totalSteps={12}
+        currentStep={13}
+        totalSteps={13}
         title="Permissions"
-        subtitle="Step 6 of 6"
-      />
+        />
 
       <ScrollView 
         style={{ flex: 1 }}
@@ -86,7 +104,7 @@ export default function NotificationPermissionScreen({ route, navigation }) {
           <View style={styles.notifCard}>
             <Text style={styles.notifIcon}>💌</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.notifTitle}>Loviq</Text>
+              <Text style={styles.notifTitle}>Vela</Text>
               <Text style={styles.notifBody}>You have a new match! 🎉</Text>
             </View>
           </View>
@@ -97,12 +115,10 @@ export default function NotificationPermissionScreen({ route, navigation }) {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.base }]}>
         <Button
-          label="Enable Notifications 🔔"
-          variant="ghost"
-          style={{ backgroundColor: Colors.white, ...styles.whiteBtn }}
+          label={loading ? 'Saving...' : 'Enable Notifications'}
+          style={styles.whiteBtn}
           labelStyle={{ color: Colors.primary }}
-          onPress={handleFinish}
-          loading={loading}
+          onPress={handleEnableNotifications}
           disabled={loading}
         />
         <Button

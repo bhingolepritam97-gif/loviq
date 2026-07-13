@@ -1,28 +1,34 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Slider from '@react-native-community/slider';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import Button from '../../components/Button';
 
 import { useAuth } from '../../context/AuthContext';
+import { updateUserProfile } from '../../services/UserService';
 
 const SHOW_ME_OPTIONS = ['Women', 'Men', 'Everyone'];
 
 export default function PreferencesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { profile, setProfile } = useAuth();
+  const { user, profile, setProfile } = useAuth();
+  
   const [distance, setDistance] = useState(profile?.distance_range || 25);
+  const [globalMode, setGlobalMode] = useState(profile?.global_mode || false);
   const [ageRange, setAgeRange] = useState(profile?.age_range || [20, 35]);
   const [showMe, setShowMe] = useState(profile?.interestedIn || 'Women');
 
-  const handleSave = () => {
-    if (profile) {
-      setProfile({
-        ...profile,
+  const handleSave = async () => {
+    if (user && profile) {
+      const updatedPrefs = {
         distance_range: distance,
+        global_mode: globalMode,
         age_range: ageRange,
         interestedIn: showMe
-      });
+      };
+      setProfile({ ...profile, ...updatedPrefs });
+      await updateUserProfile(user.uid, updatedPrefs);
     }
     navigation.goBack();
   };
@@ -39,24 +45,41 @@ export default function PreferencesScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Distance Preference */}
+        
+        {/* Global Mode Preference */}
         <View style={styles.card}>
           <View style={styles.labelRow}>
-            <Text style={styles.cardTitle}>Maximum Distance</Text>
-            <Text style={styles.cardVal}>{distance} miles</Text>
+            <Text style={styles.cardTitle}>Global Mode</Text>
+            <Switch
+              value={globalMode}
+              onValueChange={setGlobalMode}
+              trackColor={{ false: Colors.border, true: Colors.primary }}
+              thumbColor={Colors.white}
+            />
           </View>
-          <View style={styles.sliderMock}>
-            {[10, 25, 50, 100].map(dist => (
-              <TouchableOpacity
-                key={dist}
-                style={[styles.sliderOption, distance === dist && styles.sliderOptionActive]}
-                onPress={() => setDistance(dist)}
-              >
-                <Text style={[styles.sliderText, distance === dist && styles.sliderTextActive]}>{dist}m</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Text style={styles.cardDesc}>Going global allows you to match with people around the world.</Text>
         </View>
+
+        {/* Distance Preference */}
+        {!globalMode && (
+          <View style={styles.card}>
+            <View style={styles.labelRow}>
+              <Text style={styles.cardTitle}>Maximum Distance</Text>
+              <Text style={styles.cardVal}>{distance} miles</Text>
+            </View>
+            <Slider
+              style={{ width: '100%', height: 40 }}
+              minimumValue={1}
+              maximumValue={100}
+              step={1}
+              value={distance}
+              onValueChange={(val) => setDistance(val)}
+              minimumTrackTintColor={Colors.primary}
+              maximumTrackTintColor={Colors.border}
+              thumbTintColor={Colors.primary}
+            />
+          </View>
+        )}
 
         {/* Age Preference */}
         <View style={styles.card}>
@@ -114,6 +137,7 @@ const styles = StyleSheet.create({
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
   cardVal: { fontSize: 16, fontWeight: '700', color: Colors.primary },
+  cardDesc: { fontSize: 13, color: Colors.textMuted, marginTop: Spacing.xs, lineHeight: 18 },
   sliderMock: { flexDirection: 'row', gap: Spacing.sm },
   sliderOption: { flex: 1, paddingVertical: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, alignItems: 'center' },
   sliderOptionActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '08' },

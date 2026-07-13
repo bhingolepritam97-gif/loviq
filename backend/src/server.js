@@ -87,7 +87,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
-  console.log(`loviq backend listening on :${PORT}`);
+  console.log(`vela backend listening on :${PORT}`);
 });
 
 module.exports = app;

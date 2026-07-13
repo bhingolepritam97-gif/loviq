@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────
-// Loviq — GradientButton shared component
+// Vela — GradientButton shared component
 // ─────────────────────────────────────────────
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
@@ -137,10 +137,11 @@ const styles = StyleSheet.create({
     color: Colors.error,
   },
   labelDisabled: {
-    color: Colors.textLight,
+    color: Colors.white,
+    opacity: 0.9,
   },
   disabled: {
-    backgroundColor: Colors.border,
+    backgroundColor: Colors.primary + '66', // 40% opacity primary brand color
     shadowOpacity: 0,
     elevation: 0,
   },

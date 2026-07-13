@@ -4,10 +4,12 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import * as SecureStore from 'expo-secure-store';
 
+const sanitizeKey = (key) => key.replace(/[^a-zA-Z0-9._-]/g, '_');
+
 const SecureStorage = {
-  getItem: SecureStore.getItemAsync,
-  setItem: SecureStore.setItemAsync,
-  removeItem: SecureStore.deleteItemAsync,
+  getItem: (key) => SecureStore.getItemAsync(sanitizeKey(key)),
+  setItem: (key, value) => SecureStore.setItemAsync(sanitizeKey(key), value),
+  removeItem: (key) => SecureStore.deleteItemAsync(sanitizeKey(key)),
 };
 
 const firebaseConfig = {

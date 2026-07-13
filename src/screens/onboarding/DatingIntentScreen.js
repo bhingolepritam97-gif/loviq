@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, ScrollView, Text } from 'react-native';
+import { View, ScrollView, Text, StyleSheet } from 'react-native';
 import styles from './styles/datingIntent.styles';
 import useDatingIntent from './hooks/useDatingIntent';
 import OnboardingHeader from '../../components/OnboardingHeader';
 import IntentCard from './components/IntentCard';
 import StickyFooter from './components/StickyFooter';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const INTENTS = [
   {
@@ -41,13 +42,14 @@ export default function DatingIntentScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
+      <LinearGradient colors={['#FFF9FB', '#FFFFFF', '#FFFFFF']} style={StyleSheet.absoluteFill} />
+
       {/* Premium Segmented Progress Header */}
       <OnboardingHeader
         onBack={() => navigation.goBack()}
-        currentStep={8}
-        totalSteps={12}
-        title="Build Profile"
-        subtitle="Step 3 of 6"
+        currentStep={7}
+        totalSteps={13}
+        title="Create Account"
       />
 
       <ScrollView
@@ -91,6 +93,7 @@ export default function DatingIntentScreen({ route, navigation }) {
         selectedCount={selectedCount}
         percentComplete={percentComplete}
         remainingCount={remainingCount}
+        totalRequired={1}
         isEnabled={canContinue}
         onPress={handleContinue}
       />

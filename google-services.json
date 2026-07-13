@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "627555697682",
+    "project_id": "loviq-33ac0",
+    "storage_bucket": "loviq-33ac0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:627555697682:android:122e262129a9fc511784cb",
+        "android_client_info": {
+          "package_name": "com.pritambhingole.vela"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "627555697682-eql083v3o9ahcsqso3qeahfb8vfj4g7s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAe_dpsxNWHTsRW2uD9Y3nbtsTE03zSDTE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "627555697682-eql083v3o9ahcsqso3qeahfb8vfj4g7s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

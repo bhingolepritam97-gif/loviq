@@ -1,6 +1,6 @@
-# loviq backend
+# vela backend
 
-Node.js + Express + PostgreSQL/PostGIS API for the loviq dating app —
+Node.js + Express + PostgreSQL/PostGIS API for the vela dating app —
 profiles, photos, the swipe deck, and matches. Chat and Auth stay on
 Firebase for now (see rationale below); this service is scoped to Section 5
 & 6 of the Product Spec.
@@ -38,7 +38,7 @@ Optional local Postgres instead of Neon while developing:
 
 ```bash
 docker compose up -d
-# then set DATABASE_URL=postgres://loviq:loviq_dev_password@localhost:5432/loviq
+# then set DATABASE_URL=postgres://vela:fuse_dev_password@localhost:5432/vela
 ```
 
 ## Auth model

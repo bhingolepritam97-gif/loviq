@@ -10,6 +10,7 @@ export default function StickyFooter({
   selectedCount,
   percentComplete,
   remainingCount,
+  totalRequired = 3,
   isEnabled,
   onPress,
 }) {
@@ -27,6 +28,7 @@ export default function StickyFooter({
         selectedCount={selectedCount}
         percentComplete={percentComplete}
         remainingCount={remainingCount}
+        totalRequired={totalRequired}
       />
 
       {/* Action Button */}
