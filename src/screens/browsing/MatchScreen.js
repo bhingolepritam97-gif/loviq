@@ -9,7 +9,7 @@ const { width } = Dimensions.get('window');
 
 export default function MatchScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
-  const { matchProfile } = route.params || {};
+  const { matchProfile, matchId } = route.params || {};
   const { profile } = useAuth();
 
   const scale = useRef(new Animated.Value(0.3)).current;
@@ -168,7 +168,7 @@ export default function MatchScreen({ route, navigation }) {
           <Button 
             label="Send a Message" 
             onPress={() => {
-              navigation.navigate('Chat', { matchId: 'm_001', profile });
+              navigation.navigate('Chat', { matchId: matchId, profile: matchProfile });
             }}
           />
           <TouchableOpacity 

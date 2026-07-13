@@ -2,7 +2,7 @@ import { auth } from '../config/firebase';
 
 // Use environment variable if set, otherwise fallback to the production URL
 // so the app can connect when running on a physical device over Wi-Fi/Cellular.
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://loviq-api.onrender.com'; 
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://vela-api.onrender.com'; 
 
 
 

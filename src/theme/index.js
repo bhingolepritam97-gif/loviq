@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────
-// Loviq Design System
+// Vela Design System
 // Brand gradient: Magenta #E91E8C → Coral #FF6B35
 // ─────────────────────────────────────────────
 

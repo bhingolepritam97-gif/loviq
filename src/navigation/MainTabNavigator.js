@@ -4,6 +4,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '../theme';
 
 import DiscoverScreen from '../screens/browsing/DiscoverScreen';
+import ExploreScreen from '../screens/browsing/ExploreScreen';
+import LikesYouScreen from '../screens/browsing/LikesYouScreen';
 import MatchesInboxScreen from '../screens/chat/MatchesInboxScreen';
 import MyProfileScreen from '../screens/profile/MyProfileScreen';
 
@@ -44,6 +46,22 @@ export default function MainTabNavigator() {
         options={{
           tabBarLabel: 'Discover',
           tabBarIcon: ({ focused }) => <TabIcon emoji="🔥" focused={focused} />,
+        }}
+      />
+      <Tab.Screen
+        name="Explore"
+        component={ExploreScreen}
+        options={{
+          tabBarLabel: 'Explore',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" focused={focused} />,
+        }}
+      />
+      <Tab.Screen
+        name="Likes"
+        component={LikesYouScreen}
+        options={{
+          tabBarLabel: 'Likes',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="✨" focused={focused} />,
         }}
       />
       <Tab.Screen

@@ -18,10 +18,16 @@ import PreferencesScreen from '../screens/profile/PreferencesScreen';
 import PremiumScreen from '../screens/profile/PremiumScreen';
 import ManagePhotosScreen from '../screens/profile/ManagePhotosScreen';
 import ManagePromptsScreen from '../screens/profile/ManagePromptsScreen';
+import PhotoVerificationScreen from '../screens/profile/PhotoVerificationScreen';
+import AnalyticsScreen from '../screens/profile/AnalyticsScreen';
 
 import ChatScreen from '../screens/chat/ChatScreen';
 import NewMatchCarouselScreen from '../screens/chat/NewMatchCarouselScreen';
 import ChatOptionsScreen from '../screens/chat/ChatOptionsScreen';
+import ReportUserScreen from '../screens/chat/ReportUserScreen';
+import SafetyCenterScreen from '../screens/chat/SafetyCenterScreen';
+import CallRingingScreen from '../screens/chat/CallRingingScreen';
+import ActiveCallScreen from '../screens/chat/ActiveCallScreen';
 
 import { useAuth } from '../context/AuthContext';
 import { ActivityIndicator, View } from 'react-native';
@@ -59,9 +65,12 @@ export default function AppNavigator() {
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
           // Unauthenticated Flow
-          <RootStack.Screen name="Onboarding">
-            {(props) => <OnboardingNavigator {...props} initialRouteName="Splash" />}
-          </RootStack.Screen>
+          <>
+            <RootStack.Screen name="Onboarding">
+              {(props) => <OnboardingNavigator {...props} initialRouteName="Splash" />}
+            </RootStack.Screen>
+            <RootStack.Screen name="Main" component={MainTabNavigator} />
+          </>
         ) : !profile?.profileComplete ? (
           // Authenticated but profile incomplete
           <RootStack.Screen name="Onboarding">
@@ -87,11 +96,17 @@ export default function AppNavigator() {
             <RootStack.Screen name="Premium" component={PremiumScreen} options={{ presentation: 'modal' }} />
             <RootStack.Screen name="ManagePhotos" component={ManagePhotosScreen} />
             <RootStack.Screen name="ManagePrompts" component={ManagePromptsScreen} />
+            <RootStack.Screen name="PhotoVerification" component={PhotoVerificationScreen} options={{ presentation: 'modal' }} />
+            <RootStack.Screen name="Analytics" component={AnalyticsScreen} />
 
             {/* Chat Stack screens */}
             <RootStack.Screen name="Chat" component={ChatScreen} />
             <RootStack.Screen name="NewMatchCarousel" component={NewMatchCarouselScreen} />
             <RootStack.Screen name="ChatOptions" component={ChatOptionsScreen} />
+            <RootStack.Screen name="ReportUser" component={ReportUserScreen} options={{ presentation: 'modal' }} />
+            <RootStack.Screen name="SafetyCenter" component={SafetyCenterScreen} options={{ presentation: 'modal' }} />
+            <RootStack.Screen name="CallRinging" component={CallRingingScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+            <RootStack.Screen name="ActiveCall" component={ActiveCallScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           </>
         )}
       </RootStack.Navigator>

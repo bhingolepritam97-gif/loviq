@@ -1,17 +1,23 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, TextInput, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography, Spacing, Radius } from '../../theme';
+import { Colors, Typography, Spacing, Radius, Shadow } from '../../theme';
 import Button from '../../components/Button';
 import OnboardingHeader from '../../components/OnboardingHeader';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
-const STEPS_TOTAL = 12;
+const STEPS_TOTAL = 13;
 
 export default function BirthdayScreen({ route, navigation }) {
   const { name } = route.params || { name: 'User' };
   const [day, setDay] = useState('');
   const [month, setMonth] = useState('');
   const [year, setYear] = useState('');
+
+  const [dayFocused, setDayFocused] = useState(false);
+  const [monthFocused, setMonthFocused] = useState(false);
+  const [yearFocused, setYearFocused] = useState(false);
 
   const dayRef = useRef(null);
   const monthRef = useRef(null);
@@ -71,16 +77,21 @@ export default function BirthdayScreen({ route, navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
+      <LinearGradient colors={['#FFF9FB', '#FFFFFF', '#FFFFFF']} style={StyleSheet.absoluteFill} />
+
       <OnboardingHeader
         onBack={() => navigation.goBack()}
-        currentStep={5}
+        currentStep={4}
         totalSteps={STEPS_TOTAL}
-        title="Build Profile"
-        subtitle="Step 2 of 6"
+        title="Create Account"
       />
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-
+      <ScrollView 
+        style={{ flex: 1 }} 
+        contentContainerStyle={styles.scroll} 
+        keyboardShouldPersistTaps="handled" 
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>When were you born, {name}?</Text>
@@ -94,14 +105,20 @@ export default function BirthdayScreen({ route, navigation }) {
             <Text style={styles.label}>DAY</Text>
             <TextInput
               ref={dayRef}
-              style={styles.input}
+              style={[
+                styles.input,
+                dayFocused && styles.inputFocused,
+                day.length > 0 && styles.inputFilled,
+              ]}
               placeholder="DD"
               value={day}
               onChangeText={handleDayChange}
               keyboardType="number-pad"
               maxLength={2}
               textAlign="center"
-              placeholderTextColor={Colors.textLight}
+              placeholderTextColor={Colors.textMuted}
+              onFocus={() => setDayFocused(true)}
+              onBlur={() => setDayFocused(false)}
             />
           </View>
 
@@ -110,14 +127,20 @@ export default function BirthdayScreen({ route, navigation }) {
             <Text style={styles.label}>MONTH</Text>
             <TextInput
               ref={monthRef}
-              style={styles.input}
+              style={[
+                styles.input,
+                monthFocused && styles.inputFocused,
+                month.length > 0 && styles.inputFilled,
+              ]}
               placeholder="MM"
               value={month}
               onChangeText={handleMonthChange}
               keyboardType="number-pad"
               maxLength={2}
               textAlign="center"
-              placeholderTextColor={Colors.textLight}
+              placeholderTextColor={Colors.textMuted}
+              onFocus={() => setMonthFocused(true)}
+              onBlur={() => setMonthFocused(false)}
             />
           </View>
 
@@ -126,14 +149,20 @@ export default function BirthdayScreen({ route, navigation }) {
             <Text style={styles.label}>YEAR</Text>
             <TextInput
               ref={yearRef}
-              style={styles.input}
+              style={[
+                styles.input,
+                yearFocused && styles.inputFocused,
+                year.length > 0 && styles.inputFilled,
+              ]}
               placeholder="YYYY"
               value={year}
               onChangeText={handleYearChange}
               keyboardType="number-pad"
               maxLength={4}
               textAlign="center"
-              placeholderTextColor={Colors.textLight}
+              placeholderTextColor={Colors.textMuted}
+              onFocus={() => setYearFocused(true)}
+              onBlur={() => setYearFocused(false)}
             />
           </View>
         </View>
@@ -141,10 +170,21 @@ export default function BirthdayScreen({ route, navigation }) {
         {/* Live Age Display */}
         {calculatedAge !== null && (
           <View style={[styles.ageContainer, isValidAge ? styles.ageContainerValid : styles.ageContainerInvalid]}>
-            <Text style={styles.ageLabel}>CALCULATED AGE</Text>
-            <Text style={styles.ageVal}>{calculatedAge} 🎂</Text>
+            <View style={styles.ageHeader}>
+              <Ionicons 
+                name={isValidAge ? "checkmark-circle" : "close-circle"} 
+                size={22} 
+                color={isValidAge ? '#E91E8C' : '#FF3B30'} 
+              />
+              <Text style={[styles.ageLabel, { color: isValidAge ? '#E91E8C' : '#FF3B30' }]}>
+                {isValidAge ? 'CONFIRMED AGE' : 'INVALID AGE'}
+              </Text>
+            </View>
+            <Text style={[styles.ageVal, { color: isValidAge ? '#E91E8C' : '#FF3B30' }]}>
+              {calculatedAge} years old {isValidAge ? '🎉' : '⚠️'}
+            </Text>
             {!isValidAge && (
-              <Text style={styles.ageError}>You must be 18 or older to join Loviq</Text>
+              <Text style={styles.ageError}>You must be 18 or older to join Vela</Text>
             )}
           </View>
         )}
@@ -163,46 +203,106 @@ export default function BirthdayScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  progressBar: { flexDirection: 'row', gap: 3, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
-  progressSegment: { flex: 1, height: 4, borderRadius: 2, backgroundColor: Colors.border },
-  progressActive: { backgroundColor: Colors.primary },
-  scroll: { flexGrow: 1, paddingHorizontal: Spacing['2xl'], paddingTop: Spacing.lg, paddingBottom: Spacing.xl },
-  backBtn: { marginBottom: Spacing['2xl'], alignSelf: 'flex-start' },
-  backIcon: { fontSize: 24, color: Colors.text },
-  header: { marginBottom: Spacing['2xl'] },
-  title: { fontSize: Typography.fontSize['3xl'], fontWeight: '800', color: Colors.primary, marginBottom: Spacing.sm, letterSpacing: -0.8 },
-  subtitle: { fontSize: Typography.fontSize.base, color: Colors.textMuted, lineHeight: 24 },
-  grid: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing['3xl'] },
-  fieldCol: { flex: 1, gap: Spacing.xs },
-  label: { fontSize: Typography.fontSize.xs, fontWeight: '700', color: Colors.textMuted, textAlign: 'center', letterSpacing: 1 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#FFFFFF' 
+  },
+  scroll: { 
+    flexGrow: 1, 
+    paddingHorizontal: Spacing['2xl'], 
+    paddingTop: Spacing.xl, 
+    paddingBottom: Spacing.xl 
+  },
+  header: { 
+    marginBottom: Spacing['2xl'] 
+  },
+  title: { 
+    fontSize: 30, 
+    fontWeight: '800', 
+    color: '#0D0D1A', 
+    marginBottom: Spacing.sm, 
+    letterSpacing: -1,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  subtitle: { 
+    fontSize: Typography.fontSize.base, 
+    color: Colors.textMuted, 
+    lineHeight: 24 
+  },
+  grid: { 
+    flexDirection: 'row', 
+    gap: Spacing.md, 
+    marginBottom: Spacing['2xl'] 
+  },
+  fieldCol: { 
+    flex: 1, 
+    gap: Spacing.xs 
+  },
+  label: { 
+    fontSize: Typography.fontSize.xs, 
+    fontWeight: '700', 
+    color: Colors.textMuted, 
+    textAlign: 'center', 
+    letterSpacing: 1.5 
+  },
   input: {
     height: 60,
-    backgroundColor: Colors.surface,
+    backgroundColor: '#F8F9FA',
     borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderColor: '#EAEAEA',
     borderRadius: Radius.md,
-    fontSize: Typography.fontSize.xl,
+    fontSize: 22,
     fontWeight: '800',
-    color: Colors.text,
+    color: '#0D0D1A',
+  },
+  inputFocused: {
+    borderColor: '#E91E8C',
+    backgroundColor: '#FFF5F8',
+  },
+  inputFilled: {
+    borderColor: 'rgba(233, 30, 140, 0.4)',
+    backgroundColor: '#FFF9FB',
   },
   ageContainer: {
     padding: Spacing.xl,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.xl,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Shadow.sm,
   },
   ageContainerValid: {
-    backgroundColor: Colors.primary + '06',
-    borderColor: Colors.primary + '20',
+    backgroundColor: '#FFF9FB',
+    borderColor: 'rgba(233, 30, 140, 0.25)',
   },
   ageContainerInvalid: {
-    backgroundColor: Colors.errorLight,
-    borderColor: Colors.error + '25',
+    backgroundColor: '#FFF2F2',
+    borderColor: 'rgba(255, 59, 48, 0.25)',
   },
-  ageLabel: { fontSize: Typography.fontSize.xs, fontWeight: '800', color: Colors.primary, letterSpacing: 1.5, marginBottom: Spacing.xs },
-  ageVal: { fontSize: Typography.fontSize['5xl'], fontWeight: '800', color: Colors.primary },
-  ageError: { color: Colors.error, fontSize: Typography.fontSize.sm, fontWeight: '600', marginTop: Spacing.sm },
-  footer: { paddingHorizontal: Spacing['2xl'], paddingTop: Spacing.md },
+  ageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: Spacing.xs,
+  },
+  ageLabel: { 
+    fontSize: Typography.fontSize.xs, 
+    fontWeight: '800', 
+    letterSpacing: 1.5 
+  },
+  ageVal: { 
+    fontSize: 32, 
+    fontWeight: '800',
+  },
+  ageError: { 
+    color: '#FF3B30', 
+    fontSize: Typography.fontSize.sm, 
+    fontWeight: '600', 
+    marginTop: Spacing.sm 
+  },
+  footer: { 
+    paddingHorizontal: Spacing['2xl'], 
+    paddingTop: Spacing.md,
+    backgroundColor: 'transparent',
+  },
 });

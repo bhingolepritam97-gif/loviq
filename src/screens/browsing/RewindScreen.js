@@ -19,7 +19,7 @@ export default function RewindScreen({ navigation }) {
         <Text style={styles.emoji}>🔄</Text>
         <Text style={styles.title}>Oops! Undo Your Last Swipe</Text>
         <Text style={styles.subtitle}>
-          Did you swipe left by mistake? Rewind is a Loviq Gold premium feature. Get gold to bring them back!
+          Did you swipe left by mistake? Rewind is a Vela Gold premium feature. Get gold to bring them back!
         </Text>
 
         <TouchableOpacity 
@@ -32,7 +32,7 @@ export default function RewindScreen({ navigation }) {
             end={Gradients.gold.end}
             style={styles.gradient}
           >
-            <Text style={styles.btnText}>Upgrade to Loviq Gold</Text>
+            <Text style={styles.btnText}>Upgrade to Vela Gold</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>

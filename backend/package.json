@@ -1,7 +1,7 @@
 {
-  "name": "loviq-backend",
+  "name": "vela-backend",
   "version": "0.1.0",
-  "description": "Node.js + Express + PostgreSQL/PostGIS backend for the loviq dating app (profiles, deck, swipes, matches). Auth stays on Firebase; this service verifies Firebase ID tokens.",
+  "description": "Node.js + Express + PostgreSQL/PostGIS backend for the vela dating app (profiles, deck, swipes, matches). Auth stays on Firebase; this service verifies Firebase ID tokens.",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {

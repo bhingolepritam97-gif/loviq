@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
-import { Colors, Radius } from '../theme';
+import { Colors, Shadow, Radius } from '../theme';
 
 export default function DeleteButton({ onPress }) {
   return (

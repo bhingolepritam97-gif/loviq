@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, Radius, Gradients, Shadow } from '../../theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
-import { fetchMatches } from '../../services/ChatService';
+import { subscribeToMatches } from '../../services/ChatService';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function MatchesInboxScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -14,24 +15,42 @@ export default function MatchesInboxScreen({ navigation }) {
   const { user, profile } = useAuth();
 
   useEffect(() => {
-    if (!user) return;
-    const loadMatches = async () => {
-      const fetched = await fetchMatches();
-      setMatches(fetched);
-      setLoading(false);
-    };
-    
-    // Initial load
-    loadMatches();
+    let unsubscribe = () => {};
 
-    // Refresh on focus
-    const unsubscribe = navigation.addListener('focus', loadMatches);
-    return unsubscribe;
-  }, [user, navigation]);
+    const setupSubscription = () => {
+      if (!user) {
+        setMatches([]);
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      unsubscribe = subscribeToMatches((fetchedMatches) => {
+        setMatches(fetchedMatches);
+        setLoading(false);
+      });
+    };
+
+    setupSubscription();
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user]);
 
   // Filter matches into New Matches (unstarted conversations) and Active Chats
   const newMatches = matches.filter(m => !m.lastMessage);
-  const activeChats = matches.filter(m => m.lastMessage);
+  
+  const activeChats = matches
+    .filter(m => m.lastMessage)
+    .sort((a, b) => {
+      if (a.read === b.read) {
+        const timeA = a.lastMessageTime?.getTime ? a.lastMessageTime.getTime() : a.lastMessageTime;
+        const timeB = b.lastMessageTime?.getTime ? b.lastMessageTime.getTime() : b.lastMessageTime;
+        return timeB - timeA;
+      }
+      return a.read ? 1 : -1; // Unread (read=false) comes first
+    });
 
   // Filter active chats by query
   const filteredChats = activeChats.filter(chat =>
@@ -132,7 +151,7 @@ export default function MatchesInboxScreen({ navigation }) {
           ListHeaderComponent={renderNewMatches}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
-            const isUnread = false; // TODO: implement read status correctly if needed
+            const isUnread = item.read === false;
             return (
               <TouchableOpacity 
                 style={[styles.chatRow, isUnread && styles.unreadChatRow]}
@@ -157,12 +176,21 @@ export default function MatchesInboxScreen({ navigation }) {
                       {item.lastMessageTime ? new Date(item.lastMessageTime?.toDate ? item.lastMessageTime.toDate() : item.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                     </Text>
                   </View>
-                  <Text 
-                    style={[styles.chatPreview, isUnread && styles.unreadPreview]}
-                    numberOfLines={1}
-                  >
-                    {item.lastMessage}
-                  </Text>
+                  {item.typing?.[item.otherUser?.id] ? (
+                    <Text 
+                      style={[styles.chatPreview, { color: Colors.primary, fontWeight: '700', fontStyle: 'italic' }]}
+                      numberOfLines={1}
+                    >
+                      Typing...
+                    </Text>
+                  ) : (
+                    <Text 
+                      style={[styles.chatPreview, isUnread && styles.unreadPreview]}
+                      numberOfLines={1}
+                    >
+                      {item.lastMessage}
+                    </Text>
+                  )}
                 </View>
 
                 {isUnread && (
@@ -179,7 +207,26 @@ export default function MatchesInboxScreen({ navigation }) {
                 <Text style={styles.emptySearchTitle}>No matches found</Text>
                 <Text style={styles.emptySearchSubtitle}>We couldn't find any chats matching "{searchQuery}".</Text>
               </View>
-            ) : null
+            ) : (
+              <View style={styles.emptySearchContainer}>
+                <Ionicons name="chatbubbles-outline" size={64} color={Colors.border} />
+                <Text style={styles.emptySearchTitle}>It's quiet here...</Text>
+                <Text style={styles.emptySearchSubtitle}>Keep swiping! When you match with someone, they'll appear here.</Text>
+                <TouchableOpacity 
+                  style={styles.exploreBtn}
+                  onPress={() => navigation.navigate('Discover')}
+                >
+                  <LinearGradient
+                    colors={Gradients.primary.colors}
+                    start={Gradients.primary.start}
+                    end={Gradients.primary.end}
+                    style={styles.exploreGradient}
+                  >
+                    <Text style={styles.exploreBtnText}>Keep Discovering</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            )
           }
         />
       )}
@@ -231,8 +278,11 @@ const styles = StyleSheet.create({
   unreadPreview: { color: Colors.text, fontWeight: '700' },
   unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary, marginLeft: Spacing.md },
 
-  emptySearchContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing['2xl'], paddingTop: 40 },
+  emptySearchContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing['2xl'], paddingTop: 80 },
   emptySearchEmoji: { fontSize: 48, marginBottom: Spacing.md },
   emptySearchTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: Spacing.sm },
   emptySearchSubtitle: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', lineHeight: 20 },
+  exploreBtn: { marginTop: Spacing.xl, borderRadius: Radius.full, overflow: 'hidden', ...Shadow.sm },
+  exploreGradient: { paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md },
+  exploreBtnText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
 });

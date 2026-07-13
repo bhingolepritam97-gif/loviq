@@ -7,10 +7,10 @@ import { Colors, Typography, Spacing } from '../theme';
 export default function OnboardingHeader({
   onBack,
   currentStep,
-  totalSteps = 12,
+  totalSteps = 13,
   title = 'Build Profile',
-  subtitle = '',
 }) {
+  const subtitle = currentStep ? `Step ${currentStep} of ${totalSteps}` : '';
   const insets = useSafeAreaInsets();
 
   return (
@@ -45,6 +45,7 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     backgroundColor: Colors.background,
+    zIndex: 10,
   },
   navRow: {
     flexDirection: 'row',

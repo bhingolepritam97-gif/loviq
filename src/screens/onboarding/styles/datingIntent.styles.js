@@ -1,26 +1,27 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../../../theme';
 
 export default StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#FFFFFF',
   },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: Spacing['2xl'],
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.xl,
     paddingBottom: 220, // Leave enough space for the sticky footer
   },
   header: {
     marginBottom: Spacing.xl,
   },
   title: {
-    fontSize: Typography.fontSize['3xl'],
+    fontSize: 32,
     fontWeight: '800',
-    color: Colors.primary,
+    color: '#0D0D1A',
     marginBottom: Spacing.sm,
-    letterSpacing: -0.8,
+    letterSpacing: -1,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
   subtitle: {
     fontSize: Typography.fontSize.base,
@@ -32,18 +33,17 @@ export default StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   intentCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius['2xl'], // 24px rounded corners
+    backgroundColor: '#F8F9FA',
+    borderRadius: Radius.xl,
     padding: Spacing.xl,
     borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderColor: '#EAEAEA',
     position: 'relative',
     overflow: 'hidden',
-    ...Shadow.sm,
   },
   intentCardSelected: {
-    borderColor: Colors.transparent,
-    transform: [{ scale: 1.01 }],
+    borderColor: '#FF3A5C',
+    backgroundColor: '#FFF9FB',
     ...Shadow.md,
   },
   cardContent: {
@@ -62,15 +62,15 @@ export default StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: Radius.full,
-    backgroundColor: Colors.background,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#EAEAEA',
   },
   emojiContainerSelected: {
-    backgroundColor: Colors.primary + '10',
-    borderColor: Colors.primary + '30',
+    backgroundColor: '#FFF5F8',
+    borderColor: '#E91E8C',
   },
   emojiText: {
     fontSize: 22,
@@ -81,11 +81,11 @@ export default StyleSheet.create({
   cardTitle: {
     fontSize: Typography.fontSize.md,
     fontWeight: '800',
-    color: Colors.text,
+    color: '#0D0D1A',
     marginBottom: Spacing.xs,
   },
   cardTitleSelected: {
-    color: Colors.primary,
+    color: '#E91E8C',
   },
   cardDesc: {
     fontSize: 13,
@@ -100,7 +100,7 @@ export default StyleSheet.create({
     marginLeft: Spacing.sm,
   },
   chevronSelected: {
-    color: Colors.primary,
+    color: '#E91E8C',
   },
   selectedBorder: {
     position: 'absolute',
@@ -120,21 +120,21 @@ export default StyleSheet.create({
   quoteText: {
     fontSize: 12,
     fontStyle: 'italic',
-    color: Colors.textLight,
-    fontWeight: '500',
+    color: Colors.textMuted,
+    fontWeight: '600',
   },
   quoteSparkle: {
     fontSize: 10,
-    color: Colors.primary + '60',
+    color: '#E91E8C',
   },
   footerContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.background,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#EAEAEA',
     paddingHorizontal: Spacing['2xl'],
     paddingTop: Spacing.md,
     ...Shadow.lg,
@@ -154,7 +154,7 @@ export default StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Radius.md,
-    backgroundColor: Colors.primary + '10',
+    backgroundColor: '#FFF5F8',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -167,7 +167,7 @@ export default StyleSheet.create({
   statsTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: Colors.text,
+    color: '#0D0D1A',
   },
   statsSubtitle: {
     fontSize: 12,
@@ -190,7 +190,7 @@ export default StyleSheet.create({
     position: 'absolute',
     fontSize: 10,
     fontWeight: '800',
-    color: Colors.primary,
+    color: '#E91E8C',
   },
   progressLabel: {
     fontSize: 12,
@@ -207,7 +207,7 @@ export default StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   btnDisabled: {
-    backgroundColor: Colors.border,
+    backgroundColor: '#EAEAEA',
     opacity: 0.5,
   },
   btnGradient: {
@@ -233,12 +233,12 @@ export default StyleSheet.create({
   },
   secureText: {
     fontSize: 11,
-    color: Colors.textLight,
+    color: Colors.textMuted,
     fontWeight: '600',
   },
   secureIcon: {
     fontSize: 11,
-    color: Colors.textLight,
+    color: Colors.textMuted,
   },
   headerContainer: {
     width: '100%',
@@ -256,7 +256,7 @@ export default StyleSheet.create({
     backgroundColor: Colors.border,
   },
   progressActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#E91E8C',
   },
   headerNav: {
     flexDirection: 'row',
@@ -267,7 +267,7 @@ export default StyleSheet.create({
   },
   backIcon: {
     fontSize: 24,
-    color: Colors.text,
+    color: '#0D0D1A',
   },
   headerTitleContainer: {
     alignItems: 'center',
@@ -275,11 +275,11 @@ export default StyleSheet.create({
   headerTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: Colors.text,
+    color: '#0D0D1A',
   },
   headerSubtitle: {
     fontSize: 11,
-    color: Colors.primary,
+    color: '#E91E8C',
     fontWeight: '700',
     marginTop: 2,
   },

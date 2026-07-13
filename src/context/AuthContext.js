@@ -1,8 +1,9 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
-import { getUserProfile } from '../services/UserService';
+import { getUserProfile, updateUserProfile } from '../services/UserService';
 import { registerForPushNotificationsAsync } from '../services/PushService';
+import { Purchases } from '../services/RevenueCatService';
 
 const AuthContext = createContext();
 
@@ -18,16 +19,71 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+      console.warn('⚠️ Firebase auth initialization timed out. Proceeding...');
+    }, 6000);
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(safetyTimeout);
       if (firebaseUser) {
         setUser(firebaseUser);
         try {
-          const userProfile = await getUserProfile(firebaseUser.uid);
+          let userProfile = null;
+
+          // 4-second timeout limit for fetching profile from Firestore
+          const fetchPromise = getUserProfile(firebaseUser.uid);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Profile fetch timed out')), 4000)
+          );
+
+          try {
+            userProfile = await Promise.race([fetchPromise, timeoutPromise]);
+          } catch (fetchErr) {
+            console.warn('Profile fetch timed out or failed:', fetchErr.message);
+          }
+          
+          if (!userProfile) {
+            try {
+              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+              const isLocalComplete = await AsyncStorage.getItem(`profileComplete_${firebaseUser.uid}`);
+              if (isLocalComplete === 'true') {
+                userProfile = { 
+                  profileComplete: true,
+                  name: firebaseUser.displayName || 'User',
+                  email: firebaseUser.email || ''
+                };
+              }
+            } catch (e) {
+              console.warn('Failed to read local profileComplete status:', e);
+            }
+          }
+          
           setProfile(userProfile);
+
+          // Configure RevenueCat and check entitlement in the background
+          // so network requests never block the authentication load
+          if (userProfile) {
+            (async () => {
+              try {
+                Purchases.configure({ appUserID: firebaseUser.uid });
+                const customerInfo = await Purchases.getCustomerInfo();
+                const isPremium = typeof customerInfo.entitlements.active['gold'] !== "undefined";
+                
+                if (userProfile.isPremium !== isPremium) {
+                   userProfile.isPremium = isPremium;
+                   await updateUserProfile(firebaseUser.uid, { isPremium });
+                }
+              } catch (rcError) {
+                console.warn('[RevenueCat] Background configure failed:', rcError.message);
+              }
+            })();
+          }
+          
           // Register push notifications when user logs in
           registerForPushNotificationsAsync();
         } catch (error) {
-          console.error("Error fetching user profile:", error);
+          console.warn("Error inside authStateChanged profile setup:", error.message);
         }
       } else {
         setUser(null);

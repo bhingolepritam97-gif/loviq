@@ -32,7 +32,7 @@ export default function ChatOptionsScreen({ route, navigation }) {
   };
 
   const confirmReport = () => {
-    Alert.alert("Report Received", "Thank you for keeping Loviq safe. Our moderation team will review this profile.");
+    Alert.alert("Report Received", "Thank you for keeping Vela safe. Our moderation team will review this profile.");
     navigation.navigate('Inbox');
   };
 
@@ -83,7 +83,7 @@ export default function ChatOptionsScreen({ route, navigation }) {
 
         <TouchableOpacity style={styles.optionItem} onPress={handleReport}>
           <Text style={[styles.optionLabel, styles.dangerText]}>Report {profile?.name}</Text>
-          <Text style={styles.subLabel}>Flag this profile to Loviq safety team</Text>
+          <Text style={styles.subLabel}>Flag this profile to Vela safety team</Text>
         </TouchableOpacity>
       </View>
     </View>

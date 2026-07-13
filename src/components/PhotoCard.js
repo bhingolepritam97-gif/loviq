@@ -13,7 +13,7 @@ import DeleteButton from './DeleteButton';
 import AddPhotoCard from './AddPhotoCard';
 import QualityBadge from './QualityBadge';
 import UploadOverlay from './UploadOverlay';
-import { Colors, Radius, Gradients, Spacing } from '../theme';
+import { Colors, Shadow, Radius, Gradients, Spacing } from '../theme';
 
 export default React.memo(function PhotoCard({
   photo,

@@ -54,7 +54,7 @@ export default function Input({
         <TextInput
           style={[styles.input, leftIcon && styles.inputWithLeft, rightIcon && styles.inputWithRight, multiline && styles.multiline]}
           placeholder={placeholder}
-          placeholderTextColor={Colors.textLight}
+          placeholderTextColor={Colors.textMuted}
           value={value}
           onChangeText={onChangeText}
           keyboardType={keyboardType}

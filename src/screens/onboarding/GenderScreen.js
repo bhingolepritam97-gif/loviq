@@ -5,8 +5,9 @@ import { Colors, Typography, Spacing, Radius } from '../../theme';
 import Button from '../../components/Button';
 import { LinearGradient } from 'expo-linear-gradient';
 import OnboardingHeader from '../../components/OnboardingHeader';
+import { Ionicons } from '@expo/vector-icons';
 
-const STEPS_TOTAL = 12;
+const STEPS_TOTAL = 13;
 const GENDERS = ['Man', 'Woman', 'Non-binary', 'Transgender'];
 
 export default function GenderScreen({ route, navigation }) {
@@ -19,16 +20,16 @@ export default function GenderScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
+      <LinearGradient colors={['#FFF9FB', '#FFFFFF', '#FFFFFF']} style={StyleSheet.absoluteFill} />
+
       <OnboardingHeader
         onBack={() => navigation.goBack()}
-        currentStep={6}
+        currentStep={5}
         totalSteps={STEPS_TOTAL}
-        title="Build Profile"
-        subtitle="Step 3 of 6"
+        title="Create Account"
       />
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>How do you identify?</Text>
@@ -42,13 +43,16 @@ export default function GenderScreen({ route, navigation }) {
             return (
               <TouchableOpacity
                 key={gender}
-                style={styles.optionBtn}
+                style={[
+                  styles.optionBtn,
+                  isSelected ? styles.optionBtnSelected : styles.optionBtnUnselected
+                ]}
                 onPress={() => setSelectedGender(gender)}
                 activeOpacity={0.85}
               >
                 {isSelected ? (
                   <LinearGradient
-                    colors={['#E91E8C', '#FF6B35']}
+                    colors={['#FF3A5C', '#FF6B35']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.optionGradient}
@@ -67,16 +71,16 @@ export default function GenderScreen({ route, navigation }) {
         </View>
 
         {/* Show On Profile Toggle Card */}
-        <View style={styles.toggleCard}>
+        <View style={[styles.toggleCard, showGender ? styles.toggleCardActive : styles.toggleCardInactive]}>
           <View style={styles.toggleTextContainer}>
             <Text style={styles.toggleTitle}>Show my gender on my profile</Text>
-            <Text style={styles.toggleSubtitle}>Visible to other members</Text>
+            <Text style={styles.toggleSubtitle}>Visible to other members in the community</Text>
           </View>
           <Switch
             value={showGender}
             onValueChange={setShowGender}
-            trackColor={{ false: Colors.border, true: Colors.primary }}
-            thumbColor={Platform.OS === 'android' ? Colors.white : undefined}
+            trackColor={{ false: '#EAEAEA', true: '#E91E8C' }}
+            thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
           />
         </View>
       </ScrollView>
@@ -94,24 +98,48 @@ export default function GenderScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  progressBar: { flexDirection: 'row', gap: 3, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
-  progressSegment: { flex: 1, height: 4, borderRadius: 2, backgroundColor: Colors.border },
-  progressActive: { backgroundColor: Colors.primary },
-  scroll: { flexGrow: 1, paddingHorizontal: Spacing['2xl'], paddingTop: Spacing.lg, paddingBottom: Spacing.xl },
-  backBtn: { marginBottom: Spacing['2xl'], alignSelf: 'flex-start' },
-  backIcon: { fontSize: 24, color: Colors.text },
-  header: { marginBottom: Spacing['2xl'] },
-  title: { fontSize: Typography.fontSize['3xl'], fontWeight: '800', color: Colors.primary, marginBottom: Spacing.sm, letterSpacing: -0.8 },
-  subtitle: { fontSize: Typography.fontSize.base, color: Colors.textMuted, lineHeight: 24 },
-  optionsList: { gap: Spacing.md, marginBottom: Spacing.xl },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#FFFFFF' 
+  },
+  scroll: { 
+    flexGrow: 1, 
+    paddingHorizontal: Spacing['2xl'], 
+    paddingTop: Spacing.xl, 
+    paddingBottom: Spacing.xl 
+  },
+  header: { 
+    marginBottom: Spacing['2xl'] 
+  },
+  title: { 
+    fontSize: 32, 
+    fontWeight: '800', 
+    color: '#0D0D1A', 
+    marginBottom: Spacing.sm, 
+    letterSpacing: -1,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  subtitle: { 
+    fontSize: Typography.fontSize.base, 
+    color: Colors.textMuted, 
+    lineHeight: 24 
+  },
+  optionsList: { 
+    gap: Spacing.md, 
+    marginBottom: Spacing.xl 
+  },
   optionBtn: {
     height: 60,
     borderRadius: Radius.md,
     overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+  },
+  optionBtnUnselected: {
+    borderColor: '#EAEAEA',
+    backgroundColor: '#F8F9FA',
+  },
+  optionBtnSelected: {
+    borderColor: '#FF3A5C',
   },
   optionGradient: {
     flex: 1,
@@ -127,22 +155,54 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.xl,
   },
-  optionText: { fontSize: Typography.fontSize.lg, fontWeight: '700', color: Colors.text },
-  optionTextSelected: { color: Colors.white },
-  checkIcon: { color: Colors.white, fontSize: 18, fontWeight: '800' },
+  optionText: { 
+    fontSize: Typography.fontSize.lg, 
+    fontWeight: '700', 
+    color: '#0D0D1A' 
+  },
+  optionTextSelected: { 
+    color: '#FFFFFF' 
+  },
+  checkIcon: { 
+    color: '#FFFFFF', 
+    fontSize: 18, 
+    fontWeight: '800' 
+  },
   toggleCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
     padding: Spacing.xl,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderRadius: Radius.xl,
+    borderWidth: 1.5,
     marginTop: Spacing.lg,
   },
-  toggleTextContainer: { flex: 1, marginRight: Spacing.md },
-  toggleTitle: { fontSize: Typography.fontSize.base, fontWeight: '700', color: Colors.text, marginBottom: 2 },
-  toggleSubtitle: { fontSize: Typography.fontSize.xs, color: Colors.textMuted, fontWeight: '500' },
-  footer: { paddingHorizontal: Spacing['2xl'], paddingTop: Spacing.md },
+  toggleCardActive: {
+    backgroundColor: '#FFF9FB',
+    borderColor: 'rgba(233, 30, 140, 0.25)',
+  },
+  toggleCardInactive: {
+    backgroundColor: '#F8F9FA',
+    borderColor: '#EAEAEA',
+  },
+  toggleTextContainer: { 
+    flex: 1, 
+    marginRight: Spacing.md 
+  },
+  toggleTitle: { 
+    fontSize: Typography.fontSize.base, 
+    fontWeight: '700', 
+    color: '#0D0D1A', 
+    marginBottom: 4 
+  },
+  toggleSubtitle: { 
+    fontSize: Typography.fontSize.xs, 
+    color: Colors.textMuted, 
+    fontWeight: '500' 
+  },
+  footer: { 
+    paddingHorizontal: Spacing['2xl'], 
+    paddingTop: Spacing.md,
+    backgroundColor: 'transparent',
+  },
 });

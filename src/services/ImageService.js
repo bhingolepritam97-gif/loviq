@@ -12,7 +12,7 @@ export const requestCameraAndGalleryPermissions = async () => {
 
 export const pickImageFromLibrary = async () => {
   const options = {
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    mediaTypes: ['images'],
     allowsEditing: true,
     aspect: [3, 4],
     quality: 0.8, // Compression
@@ -22,7 +22,7 @@ export const pickImageFromLibrary = async () => {
 
 export const takePhotoWithCamera = async () => {
   const options = {
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    mediaTypes: ['images'],
     allowsEditing: true,
     aspect: [3, 4],
     quality: 0.8, // Compression
@@ -50,7 +50,7 @@ export const uploadImageToFirebase = async (uri) => {
     const downloadURL = await getDownloadURL(storageRef);
     return downloadURL;
   } catch (error) {
-    console.error("Error uploading image to Firebase Storage:", error);
+    console.warn("Error uploading image to Firebase Storage:", error.message);
     throw error;
   }
 };

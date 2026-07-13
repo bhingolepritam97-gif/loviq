@@ -1,21 +1,87 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Dimensions, Alert, ActionSheetIOS, Platform } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Dimensions, Alert, ActionSheetIOS, Platform, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import Chip from '../../components/Chip';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { blockUser, reportUser } from '../../services/UserService';
+import { recordSwipe } from '../../services/DiscoverService';
+import { Ionicons } from '@expo/vector-icons';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+
+// Mock Deep Data if missing from profile
+const DEFAULT_PROMPTS = [
+  { question: "A shower thought I recently had...", answer: "Why do we say 'slept like a baby' when babies wake up every 2 hours crying?" },
+  { question: "I'm looking for...", answer: "Someone to go to concerts with and try new restaurants." },
+];
+const DEFAULT_INSTAGRAM = [
+  'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=300',
+  'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=300',
+  'https://images.unsplash.com/photo-1504609774659-53733a1e9ce1?w=300',
+  'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=300',
+  'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300',
+  'https://images.unsplash.com/photo-1452421822248-d4c2b47f0c81?w=300',
+];
+const DEFAULT_BASICS = [
+  { icon: '📏', label: "5'9\"" },
+  { icon: '🏋️', label: "Active" },
+  { icon: '🍷', label: "Social drinker" },
+  { icon: '🐶', label: "Has a dog" },
+  { icon: '♈', label: "Aries" },
+];
 
 export default function ProfileDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { profile } = route.params || {};
-  const { user: me } = useAuth();
+  const { user: me, profile: myProfile } = useAuth();
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  
+  // Prompt Reply State
+  const [replyPrompt, setReplyPrompt] = useState(null);
+  const [replyMessage, setReplyMessage] = useState('');
 
   if (!profile) return null;
+
+  const prompts = profile.prompts || DEFAULT_PROMPTS;
+  const instagram = profile.instagramPhotos || DEFAULT_INSTAGRAM;
+  const basics = profile.basics || DEFAULT_BASICS;
+  const sharedInterests = myProfile?.interests?.filter(i => profile.interests?.includes(i)) || [];
+
+  const handleNextPhoto = () => {
+    if (activePhotoIndex < profile.photos.length - 1) {
+      setActivePhotoIndex(prev => prev + 1);
+    }
+  };
+
+  const handlePrevPhoto = () => {
+    if (activePhotoIndex > 0) {
+      setActivePhotoIndex(prev => prev - 1);
+    }
+  };
+
+  const handleSwipeAction = async (direction, message = null) => {
+    if (!me || !profile) return;
+    try {
+      const result = await recordSwipe(me.uid, profile.id, direction, profile, message);
+      if (result?.limitReached) {
+        navigation.navigate('SuperLike');
+        return;
+      }
+      navigation.goBack();
+    } catch (err) {
+      console.error('Error swiping from profile:', err);
+    }
+  };
+
+  const handleSendPromptReply = () => {
+    if (!replyMessage.trim()) return;
+    const fullMessage = `Replying to: "${replyPrompt.question}"\n\n${replyMessage}`;
+    handleSwipeAction('super_like', fullMessage);
+    setReplyPrompt(null);
+    setReplyMessage('');
+  };
 
   const handleBlock = async () => {
     Alert.alert(
@@ -31,8 +97,6 @@ export default function ProfileDetailScreen({ route, navigation }) {
             if (success) {
               Alert.alert('User blocked');
               navigation.goBack();
-            } else {
-              Alert.alert('Error', 'Failed to block user. Please try again.');
             }
           }
         }
@@ -41,11 +105,9 @@ export default function ProfileDetailScreen({ route, navigation }) {
   };
 
   const handleReport = () => {
-    // For simplicity, using a basic alert for reason selection
-    // In a real app, this would be a Modal or a separate Screen
     Alert.prompt(
       `Report ${profile.name}`,
-      `Please provide a reason for reporting this user (e.g., Fake Profile, Harassment, Inappropriate Content).`,
+      `Please provide a reason (e.g., Fake Profile, Harassment, Inappropriate Content).`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -54,12 +116,9 @@ export default function ProfileDetailScreen({ route, navigation }) {
             if (!reason) return;
             const success = await reportUser(me?.uid, profile.id, reason);
             if (success) {
-              // Automatically block the user after reporting
               await blockUser(me?.uid, profile.id);
-              Alert.alert('Report submitted', 'Thank you for keeping the community safe. We have also blocked this user for you.');
+              Alert.alert('Report submitted', 'We have blocked this user for you.');
               navigation.goBack();
-            } else {
-              Alert.alert('Error', 'Failed to submit report.');
             }
           }
         }
@@ -82,7 +141,6 @@ export default function ProfileDetailScreen({ route, navigation }) {
         }
       );
     } else {
-      // Android fallback
       Alert.alert(
         'Safety Options',
         'What would you like to do?',
@@ -97,82 +155,212 @@ export default function ProfileDetailScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Photo Section with indicators */}
-        <View style={styles.photoContainer}>
+      <ScrollView 
+        contentContainerStyle={styles.scroll} 
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* Full Screen Photo Header */}
+        <View style={[styles.photoContainer, { height: height * 0.75 }]}>
           <Image source={{ uri: profile.photos[activePhotoIndex] }} style={styles.photo} />
           
-          {/* Back Button */}
-          <TouchableOpacity 
-            style={[styles.backButton, { top: insets.top + Spacing.sm }]} 
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backText}>✕</Text>
-          </TouchableOpacity>
-
-          {/* Safety Menu Button */}
-          <TouchableOpacity 
-            style={[styles.safetyButton, { top: insets.top + Spacing.sm }]} 
-            onPress={showSafetyMenu}
-          >
-            <Text style={styles.backText}>⋮</Text>
-          </TouchableOpacity>
-
-          {/* Indicators */}
-          <View style={styles.indicators}>
-            {profile.photos.map((_, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[styles.indicator, activePhotoIndex === i && styles.indicatorActive]}
-                onPress={() => setActivePhotoIndex(i)}
-              />
-            ))}
+          {/* Tap Navigation Overlays */}
+          <View style={styles.tapNavigationOverlay}>
+            <TouchableOpacity style={styles.tapAreaHalf} onPress={handlePrevPhoto} activeOpacity={1} />
+            <TouchableOpacity style={styles.tapAreaHalf} onPress={handleNextPhoto} activeOpacity={1} />
           </View>
 
-          {/* Scrim Overlay */}
-          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={styles.photoScrim}>
-            <Text style={styles.photoName}>{profile.name}, {profile.age}</Text>
+          {/* Top Controls */}
+          <LinearGradient colors={['rgba(0,0,0,0.6)', 'transparent']} style={[styles.topScrim, { paddingTop: insets.top + Spacing.sm }]}>
+            <View style={styles.headerControls}>
+              <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
+                <Ionicons name="chevron-down" size={28} color={Colors.white} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconButton} onPress={showSafetyMenu}>
+                <Ionicons name="ellipsis-horizontal" size={24} color={Colors.white} />
+              </TouchableOpacity>
+            </View>
+            {/* Indicators */}
+            <View style={styles.indicators}>
+              {profile.photos.map((_, i) => (
+                <View key={i} style={[styles.indicator, activePhotoIndex === i && styles.indicatorActive]} />
+              ))}
+            </View>
+          </LinearGradient>
+
+          {/* Bottom Info Overlay */}
+          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.bottomScrim}>
+            <Text style={styles.photoName}>{profile.name}, {profile.age} {profile.isVerified && <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />}</Text>
+            <Text style={styles.jobText}>💼 {profile.job} {profile.school ? `at ${profile.school}` : ''}</Text>
+            <Text style={styles.distanceText}>📍 {profile.distance} miles away</Text>
           </LinearGradient>
         </View>
 
-        {/* Details Card */}
-        <View style={styles.detailsContainer}>
-          <Text style={styles.jobText}>💼 {profile.job} at {profile.school || 'N/A'}</Text>
-          <Text style={styles.distanceText}>📍 Lives in {profile.location} • {profile.distance} miles away</Text>
-
-          <View style={styles.divider} />
-
-          <Text style={styles.sectionTitle}>About Me</Text>
-          <Text style={styles.bioText}>{profile.bio}</Text>
-
-          <View style={styles.divider} />
-
-          <Text style={styles.sectionTitle}>Interests</Text>
-          <View style={styles.chips}>
-            {profile.interests.map((interest, idx) => (
-              <Chip key={idx} label={interest} selected={true} />
-            ))}
+        <View style={styles.contentBody}>
+          
+          {/* Bio Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About Me</Text>
+            <Text style={styles.bioText}>{profile.bio || "I'm new here! Say hi!"}</Text>
           </View>
+
+          <View style={styles.divider} />
+
+          {/* Basics Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Basics</Text>
+            <View style={styles.basicsGrid}>
+              {basics.map((item, idx) => (
+                <View key={idx} style={styles.basicPill}>
+                  <Text style={styles.basicEmoji}>{item.icon}</Text>
+                  <Text style={styles.basicLabel}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Prompts Section */}
+          {prompts.length > 0 && (
+            <View style={styles.section}>
+              {prompts.map((prompt, idx) => (
+                <TouchableOpacity 
+                  key={idx} 
+                  style={styles.promptCard}
+                  activeOpacity={0.7}
+                  onPress={() => setReplyPrompt(prompt)}
+                >
+                  <Text style={styles.promptQuestion}>{prompt.question}</Text>
+                  <Text style={styles.promptAnswer}>{prompt.answer}</Text>
+                  <View style={styles.promptReplyHint}>
+                    <Ionicons name="heart" size={16} color={Colors.primary} />
+                    <Text style={styles.promptReplyText}>Like & Reply</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.divider} />
+
+          {/* Shared Interests */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Interests</Text>
+            {sharedInterests.length > 0 && (
+              <Text style={styles.sharedMatchText}>✨ You both love {sharedInterests.length > 1 ? `${sharedInterests.slice(0, 2).join(' & ')}` : sharedInterests[0]}!</Text>
+            )}
+            <View style={styles.chips}>
+              {profile.interests.map((interest, idx) => {
+                const isShared = sharedInterests.includes(interest);
+                return (
+                  <View key={idx} style={[styles.interestChip, isShared && styles.interestChipShared]}>
+                    <Text style={[styles.interestChipText, isShared && styles.interestChipTextShared]}>{interest}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Spotify Anthem Placeholder */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>My Anthem</Text>
+            <View style={styles.spotifyCard}>
+              <View style={styles.spotifyArt} />
+              <View style={styles.spotifyInfo}>
+                <Text style={styles.songTitle}>Blinding Lights</Text>
+                <Text style={styles.artistName}>The Weeknd</Text>
+              </View>
+              <Ionicons name="logo-spotify" size={32} color="#1DB954" style={styles.spotifyIcon} />
+            </View>
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Instagram Grid Placeholder */}
+          <View style={styles.section}>
+            <View style={styles.instaHeader}>
+              <Text style={styles.sectionTitle}>Recent Photos</Text>
+              <Ionicons name="logo-instagram" size={24} color={Colors.textMuted} />
+            </View>
+            <View style={styles.instaGrid}>
+              {instagram.map((uri, idx) => (
+                <Image key={idx} source={{ uri }} style={styles.instaPhoto} />
+              ))}
+            </View>
+          </View>
+          
+          {/* Report Footer */}
+          <TouchableOpacity style={styles.reportFooter} onPress={showSafetyMenu}>
+            <Text style={styles.reportText}>Report {profile.name}</Text>
+          </TouchableOpacity>
+
         </View>
       </ScrollView>
 
-      {/* Action Buttons Floating at bottom */}
-      <View style={[styles.floatingActions, { paddingBottom: insets.bottom + Spacing.md }]}>
-        <TouchableOpacity style={[styles.circleButton, styles.nope]} onPress={() => navigation.navigate('Discover')}>
-          <Text style={styles.btnEmoji}>✕</Text>
+      {/* Bottom Swipe Controls */}
+      <View style={styles.bottomControls}>
+        <TouchableOpacity style={[styles.circleBtn, styles.nopeBtn]} onPress={() => handleSwipeAction('left')}>
+          <Text style={styles.btnIcon}>✕</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.circleButton, styles.superLike]} onPress={() => navigation.navigate('SuperLike')}>
-          <Text style={styles.btnEmoji}>⭐</Text>
+        <TouchableOpacity style={[styles.circleBtn, styles.superBtn]} onPress={() => handleSwipeAction('up')}>
+          <Text style={styles.btnIcon}>⭐</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.circleButton, styles.like]} onPress={() => {
-          navigation.goBack();
-          if (profile.id === 'p_001') {
-            navigation.navigate('Match', { profile });
-          }
-        }}>
-          <Text style={styles.btnEmoji}>❤️</Text>
+        <TouchableOpacity style={[styles.circleBtn, styles.likeBtn]} onPress={() => handleSwipeAction('right')}>
+          <Text style={styles.btnIconLike}>❤️</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Prompt Reply Modal */}
+      <Modal
+        visible={!!replyPrompt}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setReplyPrompt(null)}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setReplyPrompt(null)} />
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + Spacing.lg }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reply to Prompt</Text>
+              <TouchableOpacity onPress={() => setReplyPrompt(null)}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalPromptPreview}>
+              <Text style={styles.modalPromptQuestion}>{replyPrompt?.question}</Text>
+              <Text style={styles.modalPromptAnswer}>{replyPrompt?.answer}</Text>
+            </View>
+            <TextInput
+              style={styles.replyInput}
+              placeholder="Write a message..."
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              autoFocus
+              value={replyMessage}
+              onChangeText={setReplyMessage}
+            />
+            <TouchableOpacity 
+              style={[styles.sendReplyBtn, !replyMessage.trim() && { opacity: 0.5 }]}
+              onPress={handleSendPromptReply}
+              disabled={!replyMessage.trim()}
+            >
+              <LinearGradient
+                colors={Gradients.primary.colors}
+                start={Gradients.primary.start}
+                end={Gradients.primary.end}
+                style={styles.sendReplyGradient}
+              >
+                <Text style={styles.sendReplyText}>Send with Super Like ⭐</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </View>
   );
 }
@@ -180,27 +368,78 @@ export default function ProfileDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { paddingBottom: 150 },
-  photoContainer: { width: width, height: width * 1.25, position: 'relative' },
+  photoContainer: { width: width, position: 'relative' },
   photo: { width: '100%', height: '100%', resizeMode: 'cover' },
-  backButton: { position: 'absolute', left: Spacing.xl, width: 40, height: 40, borderRadius: Radius.xl, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
-  backText: { color: Colors.white, fontSize: 18, fontWeight: '700' },
-  safetyButton: { position: 'absolute', right: Spacing.xl, width: 40, height: 40, borderRadius: Radius.xl, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
-  indicators: { position: 'absolute', top: 12, flexDirection: 'row', width: '100%', paddingHorizontal: Spacing.xl, gap: Spacing.xs, zIndex: 10 },
-  indicator: { flex: 1, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.4)' },
+  tapNavigationOverlay: { ...StyleSheet.absoluteFillObject, flexDirection: 'row', zIndex: 10 },
+  tapAreaHalf: { flex: 1 },
+  
+  topScrim: { position: 'absolute', top: 0, left: 0, right: 0, height: 120, zIndex: 20 },
+  headerControls: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.xl },
+  iconButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  indicators: { flexDirection: 'row', paddingHorizontal: Spacing.xl, gap: 4, marginTop: Spacing.md },
+  indicator: { flex: 1, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.4)' },
   indicatorActive: { backgroundColor: Colors.white },
-  photoScrim: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, justifyContent: 'flex-end', padding: Spacing.xl },
-  photoName: { fontSize: 32, fontWeight: '800', color: Colors.white },
-  detailsContainer: { padding: Spacing.xl },
-  jobText: { fontSize: 16, color: Colors.text, fontWeight: '600', marginBottom: Spacing.sm },
-  distanceText: { fontSize: 14, color: Colors.textMuted, marginBottom: Spacing.md },
-  divider: { height: 1.5, backgroundColor: Colors.border, marginVertical: Spacing.lg },
-  sectionTitle: { fontSize: Typography.fontSize.base, fontWeight: '700', color: Colors.text, marginBottom: Spacing.md },
-  bioText: { fontSize: 15, color: Colors.textMuted, lineHeight: 22 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
-  floatingActions: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: Spacing.xl, backgroundColor: 'transparent' },
-  circleButton: { width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', ...Shadow.lg },
-  nope: { width: 56, height: 56, borderColor: Colors.passRed, borderWidth: 1.5 },
-  superLike: { width: 48, height: 48, borderColor: Colors.superBlue, borderWidth: 1.5 },
-  like: { borderColor: Colors.likeGreen, borderWidth: 1.5 },
-  btnEmoji: { fontSize: 24 },
+  
+  bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 160, justifyContent: 'flex-end', padding: Spacing.xl, zIndex: 5 },
+  photoName: { fontSize: 36, fontWeight: '800', color: Colors.white, letterSpacing: -0.5 },
+  jobText: { fontSize: 16, color: 'rgba(255,255,255,0.9)', fontWeight: '600', marginTop: 4 },
+  distanceText: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
+  
+  contentBody: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.xl, backgroundColor: Colors.background },
+  section: { marginBottom: Spacing.lg },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.text, marginBottom: Spacing.md },
+  bioText: { fontSize: 16, color: Colors.text, lineHeight: 24, fontWeight: '400' },
+  divider: { height: 1, backgroundColor: Colors.border, marginVertical: Spacing.lg },
+  
+  basicsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  basicPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
+  basicEmoji: { fontSize: 16, marginRight: 6 },
+  basicLabel: { fontSize: 14, fontWeight: '600', color: Colors.text },
+
+  promptCard: { backgroundColor: Colors.surface, padding: Spacing.lg, borderRadius: Radius.lg, marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
+  promptQuestion: { fontSize: 14, color: Colors.textMuted, fontWeight: '700', marginBottom: 8 },
+  promptAnswer: { fontSize: 20, color: Colors.text, fontWeight: '600', lineHeight: 28 },
+
+  sharedMatchText: { fontSize: 14, fontWeight: '700', color: Colors.primary, marginBottom: Spacing.md },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  interestChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  interestChipShared: { backgroundColor: Colors.primary + '15', borderColor: Colors.primary },
+  interestChipText: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  interestChipTextShared: { color: Colors.primary },
+
+  spotifyCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border },
+  spotifyArt: { width: 60, height: 60, borderRadius: 4, backgroundColor: '#333' },
+  spotifyInfo: { flex: 1, marginLeft: Spacing.md },
+  songTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  artistName: { fontSize: 14, color: Colors.textMuted, marginTop: 2 },
+  spotifyIcon: { marginLeft: Spacing.md },
+
+  instaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  instaGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
+  instaPhoto: { width: (width - Spacing.xl * 2 - 16) / 3, height: (width - Spacing.xl * 2 - 16) / 3, borderRadius: Radius.md, backgroundColor: Colors.surface },
+
+  reportFooter: { paddingVertical: Spacing.xl, alignItems: 'center' },
+  reportText: { fontSize: 14, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
+
+  bottomControls: { position: 'absolute', bottom: 30, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center', paddingHorizontal: Spacing['2xl'] },
+  circleBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', ...Shadow.md },
+  nopeBtn: { borderWidth: 1.5, borderColor: Colors.border },
+  superBtn: { backgroundColor: Colors.surface, width: 44, height: 44, borderRadius: 22 },
+  likeBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.surface, overflow: 'hidden', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  btnIcon: { fontSize: 24 },
+  btnIconLike: { fontSize: 24 },
+  promptReplyHint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.md, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+  promptReplyText: { fontSize: 13, color: Colors.primary, fontWeight: '700' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject },
+  modalContent: { backgroundColor: Colors.surfaceElevated, borderTopLeftRadius: Radius['2xl'], borderTopRightRadius: Radius['2xl'], padding: Spacing.xl },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: Colors.text },
+  modalPromptPreview: { backgroundColor: Colors.background, padding: Spacing.md, borderRadius: Radius.lg, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.border },
+  modalPromptQuestion: { fontSize: 13, color: Colors.textMuted, fontWeight: '700', marginBottom: 4 },
+  modalPromptAnswer: { fontSize: 15, color: Colors.text, lineHeight: 22 },
+  replyInput: { backgroundColor: Colors.background, borderRadius: Radius.lg, padding: Spacing.md, color: Colors.text, fontSize: 16, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.xl },
+  sendReplyBtn: { width: '100%', borderRadius: Radius.full, overflow: 'hidden' },
+  sendReplyGradient: { paddingVertical: Spacing.md, alignItems: 'center' },
+  sendReplyText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
 });

@@ -14,11 +14,17 @@ export default function DiscoverScreen({ navigation }) {
   const [profiles, setProfiles] = useState([]);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [lastSwipedProfile, setLastSwipedProfile] = useState(null);
+  const rewindTimeout = useRef(null);
   const insets = useSafeAreaInsets();
   const position = useRef(new Animated.ValueXY()).current;
   const { user, profile } = useAuth();
 
   const [error, setError] = useState(null);
+  
+  // Track daily likes (simplified for client-side demo)
+  const [likesCount, setLikesCount] = useState(0);
+  const FREE_DAILY_LIKES = 10;
 
   const fetchProfiles = useCallback(async () => {
     if (user && profile) {
@@ -61,6 +67,12 @@ export default function DiscoverScreen({ navigation }) {
 
   const nopeOpacity = position.x.interpolate({
     inputRange: [-width / 4, 0],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const superLikeOpacity = position.y.interpolate({
+    inputRange: [-height / 6, 0],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
@@ -114,7 +126,9 @@ export default function DiscoverScreen({ navigation }) {
         position.setValue({ x: gestureState.dx, y: gestureState.dy });
       },
       onPanResponderRelease: (evt, gestureState) => {
-        if (gestureState.dx > SWIPE_THRESHOLD) {
+        if (gestureState.dy < -SWIPE_THRESHOLD) {
+          forceSwipe('up');
+        } else if (gestureState.dx > SWIPE_THRESHOLD) {
           forceSwipe('right');
         } else if (gestureState.dx < -SWIPE_THRESHOLD) {
           forceSwipe('left');
@@ -126,9 +140,29 @@ export default function DiscoverScreen({ navigation }) {
   ).current;
 
   const forceSwipe = (direction) => {
-    const x = direction === 'right' ? width + 120 : -width - 120;
+    if (profiles.length === 0) return;
+    
+    // Paywall Intercept for Likes
+    if (direction === 'right' && !profile?.isPremium && likesCount >= FREE_DAILY_LIKES) {
+      navigation.navigate('Profile', { screen: 'Premium' });
+      resetPosition();
+      return;
+    }
+
+    // Paywall Intercept for Super Likes
+    if (direction === 'up') {
+      const superLikesLeft = profile?.superLikesCount ?? (profile?.isPremium ? 5 : 1);
+      if (superLikesLeft <= 0) {
+        navigation.navigate('SuperLike');
+        resetPosition();
+        return;
+      }
+    }
+
+    const x = direction === 'right' ? width + 120 : direction === 'left' ? -width - 120 : 0;
+    const y = direction === 'up' ? -height - 120 : 0;
     Animated.timing(position, {
-      toValue: { x, y: 0 },
+      toValue: { x, y },
       duration: 250,
       useNativeDriver: false,
     }).start(() => onSwipeComplete(direction));
@@ -140,12 +174,29 @@ export default function DiscoverScreen({ navigation }) {
     setActivePhotoIndex(0);
     position.setValue({ x: 0, y: 0 });
 
+    if (direction === 'left') {
+      setLastSwipedProfile(swipedProfile);
+      if (rewindTimeout.current) clearTimeout(rewindTimeout.current);
+      rewindTimeout.current = setTimeout(() => {
+        setLastSwipedProfile(null);
+      }, 5000);
+    } else {
+      setLastSwipedProfile(null);
+      // Increment likes counter
+      if (direction === 'right' || direction === 'up') {
+        setLikesCount(prev => prev + 1);
+      }
+    }
+
     if (user && swipedProfile) {
       try {
         const matchResult = await recordSwipe(user.uid, swipedProfile.id, direction, swipedProfile);
         if (matchResult) {
           // It's a match!
-          navigation.navigate('Match', { profile: matchResult.matchedUser });
+          navigation.navigate('Match', { 
+            matchProfile: matchResult.matchedUser,
+            matchId: matchResult.id 
+          });
         }
       } catch (err) {
         console.error('Error recording swipe:', err);
@@ -159,6 +210,19 @@ export default function DiscoverScreen({ navigation }) {
       friction: 4,
       useNativeDriver: false,
     }).start();
+  };
+
+  const handleRewind = () => {
+    if (!profile?.isPremium) {
+      navigation.navigate('Rewind');
+      return;
+    }
+
+    if (lastSwipedProfile) {
+      setProfiles(prev => [lastSwipedProfile, ...prev]);
+      setLastSwipedProfile(null);
+      if (rewindTimeout.current) clearTimeout(rewindTimeout.current);
+    }
   };
 
   const renderCardStack = () => {
@@ -199,20 +263,34 @@ export default function DiscoverScreen({ navigation }) {
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>😢</Text>
           <Text style={styles.emptyTitle}>No more profiles nearby</Text>
-          <Text style={styles.emptySubtitle}>Try expanding your filters or check back later!</Text>
-          <TouchableOpacity 
-            style={styles.retryButton} 
-            onPress={fetchProfiles}
-          >
-            <LinearGradient
-              colors={Gradients.primary.colors}
-              start={Gradients.primary.start}
-              end={Gradients.primary.end}
-              style={styles.retryButtonGradient}
+          <Text style={styles.emptySubtitle}>You've seen everyone nearby — check back in 4 hours for new people!</Text>
+          <View style={{ flexDirection: 'column', gap: Spacing.md, marginTop: Spacing.md, width: '100%', alignItems: 'center' }}>
+            <TouchableOpacity 
+              style={[styles.retryButton, { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, width: 240 }]} 
+              onPress={() => {
+                setLoading(true);
+                setTimeout(() => fetchProfiles(), 800);
+              }}
             >
-              <Text style={styles.retryButtonText}>Refresh Stack</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <View style={[styles.retryButtonGradient, { backgroundColor: 'transparent' }]}>
+                <Text style={[styles.retryButtonText, { color: Colors.text }]}>Search up to 50 miles</Text>
+              </View>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.retryButton, { width: 240 }]} 
+              onPress={fetchProfiles}
+            >
+              <LinearGradient
+                colors={Gradients.primary.colors}
+                start={Gradients.primary.start}
+                end={Gradients.primary.end}
+                style={styles.retryButtonGradient}
+              >
+                <Text style={styles.retryButtonText}>Refresh Stack</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       );
     }
@@ -284,6 +362,9 @@ export default function DiscoverScreen({ navigation }) {
             </Animated.View>
             <Animated.View style={[styles.stamp, styles.nopeStamp, { opacity: nopeOpacity }]}>
               <Text style={styles.nopeText}>NOPE</Text>
+            </Animated.View>
+            <Animated.View style={[styles.stamp, styles.superLikeStamp, { opacity: superLikeOpacity }]}>
+              <Text style={styles.superLikeText}>SUPER LIKE</Text>
             </Animated.View>
 
             {/* Profile Info overlay */}
@@ -385,7 +466,7 @@ export default function DiscoverScreen({ navigation }) {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <Text style={styles.logoText}>💜 Loviq</Text>
+        <Text style={styles.logoText}>💜 Vela</Text>
         <TouchableOpacity 
           style={styles.iconButton}
           onPress={() => navigation.navigate('Filters')}
@@ -400,62 +481,64 @@ export default function DiscoverScreen({ navigation }) {
       </View>
 
       {/* Action Buttons */}
-      {profiles.length > 0 && (
-        <View style={styles.buttonRow} accessible={false}>
-          <TouchableOpacity 
-            style={[styles.circleButton, styles.rewind]} 
-            onPress={() => navigation.navigate('Rewind')}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Rewind last swipe"
+      <View style={styles.buttonRow} accessible={false}>
+        <TouchableOpacity 
+          style={[styles.circleButton, styles.rewind, !lastSwipedProfile && { opacity: 0.5 }]} 
+          onPress={handleRewind}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Rewind last swipe"
+          disabled={!lastSwipedProfile}
+        >
+          <Text style={styles.btnEmoji}>🔄</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.circleButton, styles.nope, profiles.length === 0 && { opacity: 0.5 }]} 
+          onPress={() => forceSwipe('left')}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Pass on this profile"
+          disabled={profiles.length === 0}
+        >
+          <Text style={styles.btnEmoji}>✕</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.circleButton, styles.superLike, profiles.length === 0 && { opacity: 0.5 }]} 
+          onPress={() => forceSwipe('up')}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Super like this profile"
+          disabled={profiles.length === 0}
+        >
+          <Text style={styles.btnEmoji}>⭐</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.circleButton, styles.like, profiles.length === 0 && { opacity: 0.5 }]} 
+          onPress={() => forceSwipe('right')}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Like this profile"
+          disabled={profiles.length === 0}
+        >
+          <LinearGradient
+            colors={Gradients.primary.colors}
+            start={Gradients.primary.start}
+            end={Gradients.primary.end}
+            style={styles.likeBtnGradient}
           >
-            <Text style={styles.btnEmoji}>🔄</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.circleButton, styles.nope]} 
-            onPress={() => forceSwipe('left')}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Pass on this profile"
-          >
-            <Text style={styles.btnEmoji}>✕</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.circleButton, styles.superLike]} 
-            onPress={() => navigation.navigate('SuperLike')}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Super like this profile"
-          >
-            <Text style={styles.btnEmoji}>⭐</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.circleButton, styles.like]} 
-            onPress={() => forceSwipe('right')}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Like this profile"
-          >
-            <LinearGradient
-              colors={Gradients.primary.colors}
-              start={Gradients.primary.start}
-              end={Gradients.primary.end}
-              style={styles.likeBtnGradient}
-            >
-              <Text style={styles.btnEmojiLike}>❤️</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.circleButton, styles.boost]} 
-            onPress={() => navigation.navigate('Premium')}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Boost your profile"
-          >
-            <Text style={styles.btnEmoji}>⚡</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+            <Text style={styles.btnEmojiLike}>❤️</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.circleButton, styles.boost]} 
+          onPress={() => navigation.navigate('Premium')}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Boost your profile"
+        >
+          <Text style={styles.btnEmoji}>⚡</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -490,8 +573,10 @@ const styles = StyleSheet.create({
   stamp: { position: 'absolute', top: 48, borderWidth: 4, borderRadius: Radius.md, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, zIndex: 100, backgroundColor: 'rgba(255,255,255,0.15)' },
   likeStamp: { left: 40, borderColor: Colors.success, transform: [{ rotate: '-10deg' }] },
   nopeStamp: { right: 40, borderColor: Colors.error, transform: [{ rotate: '10deg' }] },
+  superLikeStamp: { alignSelf: 'center', bottom: 120, top: 'auto', borderColor: '#3b82f6', transform: [{ rotate: '-5deg' }], backgroundColor: 'rgba(59, 130, 246, 0.15)' },
   likeText: { fontSize: 32, fontWeight: '900', color: Colors.success, letterSpacing: 2 },
   nopeText: { fontSize: 32, fontWeight: '900', color: Colors.error, letterSpacing: 2 },
+  superLikeText: { fontSize: 26, fontWeight: '900', color: '#3b82f6', letterSpacing: 1 },
   
   buttonRow: { flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center', paddingBottom: Spacing.lg, paddingHorizontal: Spacing.md },
   circleButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', ...Shadow.md },
