@@ -15,12 +15,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pritambhingole.vela",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSUserNotificationUsageDescription": "Notifications help you receive new matches and messages.",
         "NSCameraUsageDescription": "Camera permission is required to capture verification selfies and make video calls.",
         "NSMicrophoneUsageDescription": "Microphone permission is required to connect your voice and video calls.",
         "NSLocationWhenInUseUsageDescription": "Vela uses your location to find nearby matches and show approximate distances.",
-        "NSPhotoLibraryUsageDescription": "Vela requires access to your photo library to select and upload profile pictures."
+        "NSPhotoLibraryUsageDescription": "Vela requires access to your photo library to select and upload profile pictures.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -44,8 +46,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "20274978-9acb-40b8-94d5-7c20b3a3ba34"
+        "projectId": "dcecb368-1d92-412a-9aae-d3db33e2b129"
       }
-    }
+    },
+    "owner": "pritam9773"
   }
 }

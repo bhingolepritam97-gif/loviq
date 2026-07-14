@@ -5,7 +5,7 @@ const getBaseUrl = () => {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-  return 'https://vela-api.onrender.com';
+  return 'https://loviq-api.onrender.com';
 };
 
 const BASE_URL = getBaseUrl();
