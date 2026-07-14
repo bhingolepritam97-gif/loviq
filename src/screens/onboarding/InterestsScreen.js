@@ -1,173 +1,131 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography, Spacing, Radius } from '../../theme';
-import Button from '../../components/Button';
-import Chip from '../../components/Chip';
-import OnboardingHeader from '../../components/OnboardingHeader';
-import { ALL_INTERESTS } from '../../data/constants';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { trackOnboardingStep, trackOnboardingStepCompleted } from '../../utils/onboardingAnalytics';
+import ProgressBar from '../../components/ProgressBar';
 
-const STEPS_TOTAL = 13;
-const MAX_SELECT = 7;
+const INTEREST_OPTIONS = [
+  'Travel', 'Fitness', 'Music', 'Foodie', 'Movies', 'Reading',
+  'Gaming', 'Art', 'Hiking', 'Dogs', 'Cats', 'Coffee',
+  'Yoga', 'Photography', 'Cooking', 'Dancing', 'Wine', 'Sports',
+];
 
-export default function InterestsScreen({ route, navigation }) {
-  const { name, birthday, age, gender, showGender, interestedIn, intent } = route.params || { name: 'User', birthday: '', age: 18, gender: '', showGender: true, interestedIn: [], intent: '' };
+const MIN_SELECTIONS = 3;
+
+export default function InterestsScreen({ navigation, route }) {
   const [selected, setSelected] = useState([]);
-  const insets = useSafeAreaInsets();
+  const [searchQuery, setSearchQuery] = useState('');
+  const startTime = useRef(Date.now());
 
-  const toggle = (id) => {
-    setSelected(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : prev.length < MAX_SELECT ? [...prev, id] : prev
+  useEffect(() => {
+    trackOnboardingStep('interests');
+  }, []);
+
+  const toggle = (interest) => {
+    setSelected((prev) =>
+      prev.includes(interest)
+        ? prev.filter((i) => i !== interest)
+        : [...prev, interest]
     );
   };
 
-  const categories = [...new Set(ALL_INTERESTS.map(i => i.category))];
+  const isValid = selected.length >= MIN_SELECTIONS;
+
+  const handleContinue = () => {
+    trackOnboardingStepCompleted('interests', Date.now() - startTime.current);
+    navigation.navigate('PhotoUpload', {
+      ...route.params,
+      interests: selected,
+    });
+  };
+
+  const filteredOptions = INTEREST_OPTIONS.filter((interest) =>
+    interest.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#FFF9FB', '#FFFFFF', '#FFFFFF']} style={StyleSheet.absoluteFill} />
+      <ProgressBar progress={3} totalSteps={4} />
+      <Text style={styles.title}>What are you into?</Text>
+      <Text style={styles.subtitle}>Pick at least {MIN_SELECTIONS} - this helps us match you well.</Text>
 
-      <OnboardingHeader
-        onBack={() => navigation.goBack()}
-        currentStep={8}
-        totalSteps={STEPS_TOTAL}
-        title="Create Account"
+      {/* Search Input */}
+      <TextInput
+        style={styles.searchInput}
+        placeholder="🔍 Search interests..."
+        placeholderTextColor="#999"
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        clearButtonMode="while-editing"
       />
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.titleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Your interests</Text>
-            <Text style={styles.subtitle}>Pick up to {MAX_SELECT} things you love. Your matches will see these.</Text>
-          </View>
-          <View style={[
-            styles.countBadge,
-            selected.length >= MAX_SELECT ? styles.countBadgeFull : styles.countBadgeActive
-          ]}>
-            <Text style={[
-              styles.countText,
-              selected.length >= MAX_SELECT ? styles.countTextFull : styles.countTextActive
-            ]}>
-              {selected.length}/{MAX_SELECT}
-            </Text>
-          </View>
-        </View>
-
-        {categories.map(cat => (
-          <View key={cat} style={styles.category}>
-            <Text style={styles.catLabel}>{cat}</Text>
-            <View style={styles.chips}>
-              {ALL_INTERESTS.filter(i => i.category === cat).map(interest => (
-                <Chip
-                  key={interest.id}
-                  label={interest.label}
-                  emoji={interest.emoji}
-                  selected={selected.includes(interest.id)}
-                  onPress={() => toggle(interest.id)}
-                  style={selected.includes(interest.id) ? styles.chipSelectedCustom : styles.chipUnselectedCustom}
-                />
-              ))}
-            </View>
-          </View>
-        ))}
+      <ScrollView contentContainerStyle={styles.pillWrap}>
+        {filteredOptions.length > 0 ? (
+          filteredOptions.map((interest) => {
+            const isSelected = selected.includes(interest);
+            return (
+              <TouchableOpacity
+                key={interest}
+                style={[styles.pill, isSelected && styles.pillSelected]}
+                onPress={() => toggle(interest)}
+              >
+                <Text style={[styles.pillText, isSelected && styles.pillTextSelected]}>
+                  {interest}
+                </Text>
+              </TouchableOpacity>
+            );
+          })
+        ) : (
+          <Text style={styles.noResultsText}>No interests found matching "{searchQuery}"</Text>
+        )}
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.base }]}>
-        <Button 
-          label="Continue →" 
-          onPress={() => navigation.navigate('Bio', { name, birthday, age, gender, showGender, interestedIn, intent, interests: selected })} 
-          disabled={selected.length < 1} 
-        />
-      </View>
+      <TouchableOpacity
+        style={[styles.continueButton, !isValid && styles.continueButtonDisabled]}
+        disabled={!isValid}
+        onPress={handleContinue}
+      >
+        <Text style={styles.continueButtonText}>
+          Continue {selected.length > 0 && `(${selected.length} selected)`}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#FFFFFF' 
-  },
-  scroll: { 
-    flexGrow: 1, 
-    paddingHorizontal: Spacing['2xl'], 
-    paddingTop: Spacing.xl, 
-    paddingBottom: Spacing['4xl'] 
-  },
-  titleRow: { 
-    flexDirection: 'row', 
-    alignItems: 'flex-start', 
-    marginBottom: Spacing.xl 
-  },
-  title: { 
-    fontSize: 32, 
-    fontWeight: '800', 
-    color: '#0D0D1A', 
-    marginBottom: Spacing.sm, 
-    letterSpacing: -1,
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-  },
-  subtitle: { 
-    fontSize: Typography.fontSize.sm, 
-    color: Colors.textMuted, 
-    lineHeight: 20 
-  },
-  countBadge: { 
-    borderRadius: Radius.xl, 
-    paddingHorizontal: Spacing.md, 
-    paddingVertical: Spacing.sm, 
-    marginLeft: Spacing.base, 
-    marginTop: Spacing.xs,
+  container: { flex: 1, padding: 24, paddingTop: 60, backgroundColor: '#fff' },
+  title: { fontSize: 28, fontWeight: '700', marginBottom: 4, marginTop: 16 },
+  subtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
+  searchInput: {
+    height: 48,
     borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    color: '#333',
+    marginBottom: 20,
+    backgroundColor: '#f9f9f9',
   },
-  countBadgeActive: {
-    backgroundColor: '#FFF5F8',
-    borderColor: 'rgba(233, 30, 140, 0.25)',
+  pillWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 16 },
+  pill: {
+    paddingVertical: 10, paddingHorizontal: 16, borderRadius: 24,
+    borderWidth: 1, borderColor: '#e0e0e0',
   },
-  countBadgeFull: {
-    backgroundColor: '#FFF6F2',
-    borderColor: 'rgba(255, 107, 53, 0.25)',
+  pillSelected: { backgroundColor: '#FF4667', borderColor: '#FF4667' },
+  pillText: { color: '#333', fontSize: 14 },
+  pillTextSelected: { color: '#fff', fontWeight: '600' },
+  noResultsText: {
+    color: '#999',
+    fontSize: 14,
+    textAlign: 'center',
+    width: '100%',
+    marginVertical: 40,
   },
-  countText: { 
-    fontWeight: '800', 
-    fontSize: Typography.fontSize.sm 
+  continueButton: {
+    backgroundColor: '#FF4667', borderRadius: 28, padding: 18,
+    alignItems: 'center', marginTop: 12,
   },
-  countTextActive: {
-    color: '#E91E8C',
-  },
-  countTextFull: { 
-    color: '#FF6B35',
-  },
-  category: { 
-    marginBottom: Spacing.lg 
-  },
-  catLabel: { 
-    fontSize: Typography.fontSize.xs, 
-    fontWeight: '800', 
-    color: Colors.textMuted, 
-    textTransform: 'uppercase', 
-    letterSpacing: 1.5, 
-    marginBottom: Spacing.sm 
-  },
-  chips: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    marginLeft: -Spacing.xs 
-  },
-  chipSelectedCustom: {
-    backgroundColor: '#FFF9FB',
-    borderColor: '#E91E8C',
-    borderWidth: 1.5,
-  },
-  chipUnselectedCustom: {
-    backgroundColor: '#F8F9FA',
-    borderColor: '#EAEAEA',
-    borderWidth: 1.5,
-  },
-  footer: { 
-    paddingHorizontal: Spacing['2xl'], 
-    paddingTop: Spacing.md,
-    backgroundColor: 'transparent',
-  },
+  continueButtonDisabled: { backgroundColor: '#ccc' },
+  continueButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

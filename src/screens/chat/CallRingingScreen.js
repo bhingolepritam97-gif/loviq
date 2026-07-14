@@ -1,13 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing } from '../../theme';
 import Avatar from '../../components/Avatar';
+import { socketService } from '../../api/socket';
 
 export default function CallRingingScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
-  const { profile, callType } = route.params || {};
+  const { profile, callType = 'video', isIncoming = false, signalData } = route.params || {};
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -15,23 +16,56 @@ export default function CallRingingScreen({ route, navigation }) {
     // Pulsing animation
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.2, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
+        Animated.timing(pulseAnim, { toValue: 1.2, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true })
       ])
     ).start();
 
-    // Mock connection: automatically pick up after 3 seconds
-    const timer = setTimeout(() => {
-      navigation.replace('ActiveCall', { profile, callType });
-    }, 3500);
+    const socket = socketService.getSocket();
 
-    return () => clearTimeout(timer);
-  }, []);
+    // Outgoing call: notify the backend socket to alert the recipient
+    if (!isIncoming && socket && profile?.id) {
+      socket.emit("call_user", { targetUserId: profile.id, callType });
+    }
+
+    // Register active calling listeners
+    if (socket) {
+      socket.on("call_accepted", () => {
+        navigation.replace('ActiveCall', { profile, callType, isInitiator: true });
+      });
+      socket.on("call_ended", () => {
+        navigation.goBack();
+      });
+    }
+
+    return () => {
+      if (socket) {
+        socket.off("call_accepted");
+        socket.off("call_ended");
+      }
+    };
+  }, [isIncoming, profile, callType]);
+
+  const handleAccept = () => {
+    const socket = socketService.getSocket();
+    if (socket && profile?.id) {
+      socket.emit("accept_call", { targetUserId: profile.id });
+    }
+    navigation.replace('ActiveCall', { profile, callType, isInitiator: false, signalData });
+  };
+
+  const handleDecline = () => {
+    const socket = socketService.getSocket();
+    if (socket && profile?.id) {
+      socket.emit("end_call", { targetUserId: profile.id });
+    }
+    navigation.goBack();
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
-        <Text style={styles.callingText}>Calling...</Text>
+        <Text style={styles.callingText}>{isIncoming ? "Incoming call..." : "Ringing..."}</Text>
         <Text style={styles.nameText}>{profile?.name}</Text>
       </View>
 
@@ -43,9 +77,20 @@ export default function CallRingingScreen({ route, navigation }) {
       </View>
 
       <View style={styles.controls}>
-        <TouchableOpacity style={styles.endBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="call" size={32} color={Colors.white} style={{ transform: [{ rotate: '135deg' }] }} />
-        </TouchableOpacity>
+        {isIncoming ? (
+          <View style={styles.incomingControlsRow}>
+            <TouchableOpacity style={[styles.btn, styles.declineBtn]} onPress={handleDecline}>
+              <Ionicons name="call" size={32} color={Colors.white} style={{ transform: [{ rotate: '135deg' }] }} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.btn, styles.acceptBtn]} onPress={handleAccept}>
+              <Ionicons name="call" size={32} color={Colors.white} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={[styles.btn, styles.declineBtn]} onPress={handleDecline}>
+            <Ionicons name="call" size={32} color={Colors.white} style={{ transform: [{ rotate: '135deg' }] }} />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -62,5 +107,8 @@ const styles = StyleSheet.create({
   avatarWrap: { borderRadius: 70, borderWidth: 4, borderColor: 'rgba(255,255,255,0.3)' },
   
   controls: { alignItems: 'center', paddingBottom: Spacing.xl * 2 },
-  endBtn: { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.error, justifyContent: 'center', alignItems: 'center' }
+  incomingControlsRow: { flexDirection: 'row', gap: Spacing.xl * 2 },
+  btn: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center' },
+  declineBtn: { backgroundColor: Colors.error },
+  acceptBtn: { backgroundColor: '#4CD964' } // iOS call-answer green
 });

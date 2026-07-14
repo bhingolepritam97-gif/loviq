@@ -105,6 +105,49 @@ export default function SafetyCenterScreen({ route, navigation }) {
           <Ionicons name="chevron-forward" size={20} color={Colors.border} />
         </TouchableOpacity>
 
+        {/* Safe Dating Guide Section */}
+        <Text style={[styles.sectionHeader, { marginTop: Spacing.xl }]}>Dating Safety Guidelines</Text>
+        
+        <View style={styles.tipCard}>
+          <Ionicons name="videocam-outline" size={22} color={Colors.primary} style={styles.tipIcon} />
+          <View style={styles.tipTextWrap}>
+            <Text style={styles.tipTitle}>Video Chat First</Text>
+            <Text style={styles.tipDesc}>Set up a quick voice or video call before meeting in person. It's a safe way to verify authenticity and build trust.</Text>
+          </View>
+        </View>
+
+        <View style={styles.tipCard}>
+          <Ionicons name="cafe-outline" size={22} color={Colors.primary} style={styles.tipIcon} />
+          <View style={styles.tipTextWrap}>
+            <Text style={styles.tipTitle}>Meet in Public Places</Text>
+            <Text style={styles.tipDesc}>Always coordinate your first few dates in busy, crowded locations (cafes, restaurants) and never meet at a private residence.</Text>
+          </View>
+        </View>
+
+        <View style={styles.tipCard}>
+          <Ionicons name="car-outline" size={22} color={Colors.primary} style={styles.tipIcon} />
+          <View style={styles.tipTextWrap}>
+            <Text style={styles.tipTitle}>Control Your Transport</Text>
+            <Text style={styles.tipDesc}>Arrive and leave on your own terms. Avoid ride-sharing or letting your date pick you up from home on date one.</Text>
+          </View>
+        </View>
+
+        <View style={styles.tipCard}>
+          <Ionicons name="notifications-outline" size={22} color={Colors.primary} style={styles.tipIcon} />
+          <View style={styles.tipTextWrap}>
+            <Text style={styles.tipTitle}>Share Date Details</Text>
+            <Text style={styles.tipDesc}>Tell a trusted friend or family member where you are going, who you are meeting, and your expected return time.</Text>
+          </View>
+        </View>
+
+        <View style={[styles.tipCard, { marginBottom: Spacing.xl }]}>
+          <Ionicons name="wine-outline" size={22} color={Colors.primary} style={styles.tipIcon} />
+          <View style={styles.tipTextWrap}>
+            <Text style={styles.tipTitle}>Watch Your Drinks</Text>
+            <Text style={styles.tipDesc}>Never leave your food or beverage unattended. If it's out of your sight for any reason, order a fresh one.</Text>
+          </View>
+        </View>
+
       </ScrollView>
     </View>
   );
@@ -128,4 +171,10 @@ const styles = StyleSheet.create({
   actionTextWrap: { flex: 1 },
   actionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 4 },
   actionSubtitle: { fontSize: 13, color: Colors.textMuted },
+  
+  tipCard: { flexDirection: 'row', backgroundColor: Colors.surface, padding: Spacing.lg, borderRadius: Radius.lg, marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
+  tipIcon: { marginRight: Spacing.md, marginTop: 2 },
+  tipTextWrap: { flex: 1 },
+  tipTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 4 },
+  tipDesc: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
 });

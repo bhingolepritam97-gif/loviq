@@ -2,10 +2,11 @@
   "expo": {
     "name": "Vela",
     "slug": "loviq",
+    "scheme": "vela",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/logo.png",
       "resizeMode": "contain",
@@ -15,7 +16,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.pritambhingole.vela",
       "infoPlist": {
-        "NSUserNotificationUsageDescription": "Notifications help you receive new matches and messages."
+        "NSUserNotificationUsageDescription": "Notifications help you receive new matches and messages.",
+        "NSCameraUsageDescription": "Camera permission is required to capture verification selfies and make video calls.",
+        "NSMicrophoneUsageDescription": "Microphone permission is required to connect your voice and video calls.",
+        "NSLocationWhenInUseUsageDescription": "Vela uses your location to find nearby matches and show approximate distances.",
+        "NSPhotoLibraryUsageDescription": "Vela requires access to your photo library to select and upload profile pictures."
       }
     },
     "android": {
@@ -32,7 +37,10 @@
     "plugins": [
       "expo-secure-store",
       "@react-native-firebase/app",
-      "@react-native-firebase/auth"
+      "@react-native-firebase/auth",
+      "@react-native-community/datetimepicker",
+      "expo-web-browser",
+      "expo-notifications"
     ],
     "extra": {
       "eas": {

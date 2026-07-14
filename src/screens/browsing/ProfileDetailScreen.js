@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Dimensions
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import Chip from '../../components/Chip';
+import VerifiedBadge from '../../components/VerifiedBadge';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { blockUser, reportUser } from '../../services/UserService';
@@ -42,7 +43,20 @@ export default function ProfileDetailScreen({ route, navigation }) {
   const [replyPrompt, setReplyPrompt] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
 
-  if (!profile) return null;
+  if (!profile) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.skeletonImageHeader} />
+        <View style={styles.contentBody}>
+          <View style={styles.skeletonSection}>
+            <View style={styles.skeletonTitle} />
+            <View style={styles.skeletonTextRow} />
+            <View style={styles.skeletonTextRowShort} />
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   const prompts = profile.prompts || DEFAULT_PROMPTS;
   const instagram = profile.instagramPhotos || DEFAULT_INSTAGRAM;
@@ -190,9 +204,19 @@ export default function ProfileDetailScreen({ route, navigation }) {
 
           {/* Bottom Info Overlay */}
           <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.bottomScrim}>
-            <Text style={styles.photoName}>{profile.name}, {profile.age} {profile.isVerified && <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />}</Text>
+            <View style={styles.photoNameRow}>
+              <Text style={styles.photoName}>{profile.name}, {profile.age}</Text>
+              {/* VerifiedBadge — tappable opens the trust tooltip modal */}
+              <VerifiedBadge
+                isVerified={!!profile.isVerified}
+                size="md"
+                showLabel
+                tappable
+                style={{ marginLeft: Spacing.sm, marginBottom: 3 }}
+              />
+            </View>
             <Text style={styles.jobText}>💼 {profile.job} {profile.school ? `at ${profile.school}` : ''}</Text>
-            <Text style={styles.distanceText}>📍 {profile.distance} miles away</Text>
+            <Text style={styles.distanceText}>📍 {profile.cityName ? `${profile.cityName} · ` : ''}{profile.hideDistance ? 'Location Hidden' : (profile.distance ? `${parseFloat(profile.distance).toFixed(1)} miles away` : 'Nearby')}</Text>
           </LinearGradient>
         </View>
 
@@ -203,6 +227,57 @@ export default function ProfileDetailScreen({ route, navigation }) {
             <Text style={styles.sectionTitle}>About Me</Text>
             <Text style={styles.bioText}>{profile.bio || "I'm new here! Say hi!"}</Text>
           </View>
+
+          {/* ── Trust & Safety section ─────────────────────────────────────── */}
+          <View style={styles.trustCard}>
+            <Text style={styles.trustTitle}>Trust & Safety</Text>
+
+            {profile.isVerified ? (
+              /* ── VERIFIED ── */
+              <View style={styles.trustRow}>
+                <View style={[styles.trustIconCircle, styles.trustIconVerified]}>
+                  <Ionicons name="shield-checkmark" size={18} color="#3B82F6" />
+                </View>
+                <View style={styles.trustTextBlock}>
+                  <Text style={styles.trustStatusLabel}>Photo verified</Text>
+                  <Text style={styles.trustStatusSub}>
+                    {profile.verifiedAt
+                      ? `Confirmed ${new Date(profile.verifiedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+                      : 'Face matches profile photos'}
+                  </Text>
+                </View>
+                <VerifiedBadge isVerified size="sm" showLabel={false} />
+              </View>
+            ) : (
+              /* ── UNVERIFIED ── */
+              <View style={styles.trustRow}>
+                <View style={[styles.trustIconCircle, styles.trustIconUnverified]}>
+                  <Ionicons name="shield-outline" size={18} color={Colors.warning} />
+                </View>
+                <View style={styles.trustTextBlock}>
+                  <Text style={styles.trustStatusLabel}>Not yet verified</Text>
+                  <Text style={styles.trustStatusSub}>
+                    Photos haven’t been confirmed via selfie
+                  </Text>
+                </View>
+                <VerifiedBadge isVerified={false} size="sm" showLabel={false} />
+              </View>
+            )}
+
+            {/* Divider + "How it works" link */}
+            <View style={styles.trustDivider} />
+            <TouchableOpacity
+              id="how-verification-works-link"
+              style={styles.trustLearnRow}
+              onPress={() => navigation.navigate('PhotoVerification')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="information-circle-outline" size={16} color={Colors.textMuted} />
+              <Text style={styles.trustLearnText}>How verification works</Text>
+              <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+          </View>
+          {/* ─────────────────────────────────────────────────────────────────────── */}
 
           <View style={styles.divider} />
 
@@ -290,26 +365,12 @@ export default function ProfileDetailScreen({ route, navigation }) {
             </View>
           </View>
           
-          {/* Report Footer */}
-          <TouchableOpacity style={styles.reportFooter} onPress={showSafetyMenu}>
-            <Text style={styles.reportText}>Report {profile.name}</Text>
-          </TouchableOpacity>
+          {/* Report Footer removed */}
 
         </View>
       </ScrollView>
 
-      {/* Bottom Swipe Controls */}
-      <View style={styles.bottomControls}>
-        <TouchableOpacity style={[styles.circleBtn, styles.nopeBtn]} onPress={() => handleSwipeAction('left')}>
-          <Text style={styles.btnIcon}>✕</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.circleBtn, styles.superBtn]} onPress={() => handleSwipeAction('up')}>
-          <Text style={styles.btnIcon}>⭐</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.circleBtn, styles.likeBtn]} onPress={() => handleSwipeAction('right')}>
-          <Text style={styles.btnIconLike}>❤️</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Bottom Swipe Controls removed */}
 
       {/* Prompt Reply Modal */}
       <Modal
@@ -367,7 +428,7 @@ export default function ProfileDetailScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingBottom: 150 },
+  scroll: { paddingBottom: 40 },
   photoContainer: { width: width, position: 'relative' },
   photo: { width: '100%', height: '100%', resizeMode: 'cover' },
   tapNavigationOverlay: { ...StyleSheet.absoluteFillObject, flexDirection: 'row', zIndex: 10 },
@@ -390,6 +451,30 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.text, marginBottom: Spacing.md },
   bioText: { fontSize: 16, color: Colors.text, lineHeight: 24, fontWeight: '400' },
   divider: { height: 1, backgroundColor: Colors.border, marginVertical: Spacing.lg },
+
+  // Photo overlay name row — flex so badge sits inline with name text
+  photoNameRow: { flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: Spacing.sm },
+
+  trustCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    ...Shadow.sm,
+  },
+  trustTitle: { fontSize: 13, fontWeight: '800', color: Colors.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: Spacing.md },
+  trustRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  trustIconCircle: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
+  trustIconVerified: { backgroundColor: 'rgba(59,130,246,0.12)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.25)' },
+  trustIconUnverified: { backgroundColor: Colors.warningLight, borderWidth: 1, borderColor: Colors.warning + '40' },
+  trustTextBlock: { flex: 1 },
+  trustStatusLabel: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  trustStatusSub: { fontSize: 13, color: Colors.textMuted, marginTop: 2, lineHeight: 18 },
+  trustDivider: { height: 1, backgroundColor: Colors.border, marginVertical: Spacing.md },
+  trustLearnRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  trustLearnText: { fontSize: 14, color: Colors.textMuted, fontWeight: '500', flex: 1 },
   
   basicsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   basicPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
@@ -442,4 +527,10 @@ const styles = StyleSheet.create({
   sendReplyBtn: { width: '100%', borderRadius: Radius.full, overflow: 'hidden' },
   sendReplyGradient: { paddingVertical: Spacing.md, alignItems: 'center' },
   sendReplyText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
+
+  skeletonImageHeader: { width: '100%', height: height * 0.75, backgroundColor: Colors.border },
+  skeletonSection: { marginBottom: Spacing.lg },
+  skeletonTitle: { width: '40%', height: 24, borderRadius: Radius.sm, backgroundColor: Colors.border, marginBottom: Spacing.md },
+  skeletonTextRow: { width: '100%', height: 16, borderRadius: Radius.sm, backgroundColor: Colors.border, marginBottom: Spacing.xs },
+  skeletonTextRowShort: { width: '70%', height: 16, borderRadius: Radius.sm, backgroundColor: Colors.border },
 });

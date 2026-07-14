@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
@@ -12,17 +12,46 @@ export default function MyProfileScreen({ navigation }) {
   const isFocused = useIsFocused();
   const { profile } = useAuth();
 
-  // Calculate completion percentage
-  const calculateCompletion = () => {
-    let score = 50; // Base score for onboarding
-    if (profile?.photos && profile.photos.length >= 2) score += 20;
-    else if (profile?.photos && profile.photos.length === 1) score += 5;
-    if (profile?.bio) score += 15;
-    if (profile?.intent) score += 10;
-    if (profile?.interests && profile.interests.length > 0) score += 5;
-    return Math.min(score, 100);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [boostSeconds, setBoostSeconds] = useState(0);
+
+  useEffect(() => {
+    if (boostSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setBoostSeconds(s => Math.max(0, s - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [boostSeconds]);
+
+  // Define checklist steps
+  const checklist = {
+    bio: !!profile?.bio,
+    photos: !!(profile?.photos && profile.photos.length >= 2),
+    work: !!(profile?.job || profile?.school || profile?.occupation),
+    verified: !!profile?.isVerified,
   };
-  const completionPct = calculateCompletion();
+
+  const checklistItems = [
+    { key: 'bio', label: 'Write a bio', icon: 'document-text-outline' },
+    { key: 'photos', label: 'Add 2 or more photos', icon: 'camera-outline' },
+    { key: 'work', label: 'Add your work or school', icon: 'briefcase-outline' },
+    { key: 'verified', label: 'Get verified', icon: 'shield-checkmark-outline' },
+  ];
+
+  const doneCount = Object.values(checklist).filter(Boolean).length;
+  const completionPct = Math.round((doneCount / checklistItems.length) * 100);
+
+  const activateBoost = () => {
+    if (boostSeconds > 0) return;
+    setBoostSeconds(30 * 60); // 30 minutes
+    Alert.alert('Boost Activated! 🚀', 'Your profile is now receiving extra visibility for the next 30 minutes.');
+  };
+
+  const formatBoostTime = (totalSeconds) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -41,29 +70,66 @@ export default function MyProfileScreen({ navigation }) {
               <Text style={styles.editBadgeIcon}>✏️</Text>
             </View>
           </TouchableOpacity>
-          <Text style={styles.name}>
-            {profile?.name || 'User'}{profile?.age ? `, ${profile.age}` : ''}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+            <Text style={styles.name}>
+              {profile?.name || 'User'}{profile?.age ? `, ${profile.age}` : ''}
+            </Text>
+            {profile?.isVerified && (
+              <Ionicons name="checkmark-circle" size={22} color={Colors.primary} style={{ marginTop: 2 }} />
+            )}
+          </View>
           <Text style={styles.jobText}>📍 {profile?.location?.cityName || 'Earth'}</Text>
           
-          {/* Profile Completion Bar */}
+          {/* Preview my profile */}
           <TouchableOpacity 
-            style={styles.completionContainer} 
-            activeOpacity={0.7}
-            onPress={() => completionPct < 100 ? navigation.navigate('EditProfile') : null}
+            onPress={() => navigation.navigate('ProfileDetail', { profile: { ...profile, id: profile.id || profile.uid } })}
+            style={styles.previewButton}
           >
-            <View style={styles.completionHeader}>
+            <Ionicons name="eye-outline" size={14} color={Colors.textMuted} />
+            <Text style={styles.previewButtonText}>Preview my profile</Text>
+          </TouchableOpacity>
+
+          {/* Profile Completion Bar */}
+          <View style={styles.completionContainer}>
+            <TouchableOpacity 
+              style={styles.completionHeader} 
+              activeOpacity={0.7}
+              onPress={() => setChecklistOpen(!checklistOpen)}
+            >
               <Text style={styles.completionText}>
                 Profile is {completionPct}% complete
               </Text>
-              {completionPct < 100 && (
-                <Text style={styles.completionAction}>Complete it →</Text>
-              )}
-            </View>
+              <Ionicons 
+                name={checklistOpen ? 'chevron-up' : 'chevron-forward'} 
+                size={16} 
+                color={Colors.primary} 
+              />
+            </TouchableOpacity>
             <View style={styles.progressBarBg}>
               <View style={[styles.progressBarFill, { width: `${completionPct}%` }]} />
             </View>
-          </TouchableOpacity>
+
+            {checklistOpen && (
+              <View style={styles.checklistDropdown}>
+                {checklistItems.map(item => {
+                  const done = checklist[item.key];
+                  return (
+                    <View key={item.key} style={styles.checklistItem}>
+                      <Ionicons 
+                        name={done ? 'checkmark-circle' : 'ellipse-outline'} 
+                        size={20} 
+                        color={done ? '#10b981' : Colors.textMuted} 
+                      />
+                      <Ionicons name={item.icon} size={16} color={Colors.textMuted} style={{ marginLeft: 6 }} />
+                      <Text style={[styles.checklistLabel, done && styles.checklistLabelDone]}>
+                        {item.label}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Floating Quick Action Buttons */}
@@ -86,12 +152,36 @@ export default function MyProfileScreen({ navigation }) {
 
         {/* View Insights Button */}
         <TouchableOpacity 
-          style={[styles.actionButton, { width: '100%', height: 60, flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl, borderColor: Colors.border, borderWidth: 1 }]} 
+          style={[styles.actionButton, { width: '100%', height: 60, flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, borderColor: Colors.border, borderWidth: 1 }]} 
           onPress={() => navigation.navigate('Analytics')}
         >
           <Text style={{ fontSize: 20 }}>📈</Text>
-          <Text style={[styles.actionLabel, { fontSize: 16, color: Colors.text, fontWeight: '700' }]}>View Profile Insights</Text>
+          <Text style={[styles.actionLabel, { fontSize: 14, color: Colors.text, fontWeight: '700' }]}>View Profile Insights</Text>
           <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} style={{ position: 'absolute', right: Spacing.lg }} />
+        </TouchableOpacity>
+
+        {/* Profile Boost Row */}
+        <TouchableOpacity 
+          style={[styles.actionButton, { width: '100%', height: 60, flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl, borderColor: Colors.border, borderWidth: 1 }]} 
+          onPress={activateBoost}
+          activeOpacity={boostSeconds > 0 ? 1 : 0.7}
+        >
+          <Ionicons 
+            name="rocket" 
+            size={22} 
+            color={boostSeconds > 0 ? '#8b5cf6' : Colors.textMuted} 
+          />
+          <View style={{ flex: 1, marginLeft: 2, alignItems: 'flex-start' }}>
+            <Text style={[styles.actionLabel, { fontSize: 14, color: boostSeconds > 0 ? '#8b5cf6' : Colors.text, fontWeight: '700' }]}>
+              {boostSeconds > 0 ? 'Boost is active!' : 'Boost your profile'}
+            </Text>
+            <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+              {boostSeconds > 0 ? `Extra visibility for ${formatBoostTime(boostSeconds)} more` : 'Be seen by more people for 30 minutes'}
+            </Text>
+          </View>
+          {boostSeconds === 0 && (
+            <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} style={{ position: 'absolute', right: Spacing.lg }} />
+          )}
         </TouchableOpacity>
 
         {/* Premium Promo Card */}
@@ -152,6 +242,14 @@ const styles = StyleSheet.create({
   completionAction: { fontSize: 12, fontWeight: '800', color: Colors.primary },
   progressBarBg: { height: 8, backgroundColor: Colors.border, borderRadius: 4, overflow: 'hidden' },
   progressBarFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 4 },
+  
+  previewButton: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.full, borderHeight: 1, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.md, backgroundColor: Colors.surface },
+  previewButtonText: { fontSize: 12, fontWeight: '600', color: Colors.textMuted },
+  
+  checklistDropdown: { marginTop: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border },
+  checklistItem: { flexDirection: 'row', alignItems: 'center', py: 6, paddingVertical: 6 },
+  checklistLabel: { fontSize: 13, color: Colors.text, marginLeft: Spacing.sm },
+  checklistLabelDone: { color: Colors.textMuted, textDecorationLine: 'line-through' },
   
   actionRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', width: '100%', gap: Spacing.xl, marginBottom: Spacing['2xl'] },
   actionButton: { alignItems: 'center', backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.lg, width: 84, height: 84, justifyContent: 'center', ...Shadow.sm },

@@ -1,9 +1,15 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, Animated, Image, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 import { Colors, Shadow, Typography, Spacing, Radius } from '../../theme';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const { width } = Dimensions.get('window');
 
@@ -53,6 +59,27 @@ export default function WelcomeScreen({ navigation }) {
   const slideAnim = useRef(new Animated.Value(30)).current;
   const floatAnim = useRef(new Animated.Value(0)).current;
 
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || 'mock-ios-client-id',
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || 'mock-android-client-id',
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || 'mock-web-client-id',
+  });
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.authentication;
+      const credential = GoogleAuthProvider.credential(id_token);
+      signInWithCredential(auth, credential)
+        .then(() => {
+          // Firebase Auth will update context automatically
+        })
+        .catch((error) => {
+          console.error('[Google Sign-In] Firebase login failed:', error);
+          Alert.alert('Sign In Failed', error.message || 'Could not verify Google credentials.');
+        });
+    }
+  }, [response]);
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 800, delay: 100, useNativeDriver: true }),
@@ -72,15 +99,46 @@ export default function WelcomeScreen({ navigation }) {
     outputRange: [0, -6],
   });
 
-  const handleSocialLogin = (platform) => {
-    Alert.alert(
-      `${platform} Login`,
-      `Connecting to ${platform} sandbox authentication...`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign In', onPress: () => navigation.navigate('PhoneEmail', { isLogin: true }) }
-      ]
-    );
+  const [socialLoading, setSocialLoading] = useState(false);
+
+  const handleSocialLogin = async (platform) => {
+    if (platform === 'Apple') {
+      setSocialLoading(true);
+      try {
+        const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = require('firebase/auth');
+        const mockEmail = 'apple-test-user@loviq.com';
+        const mockPassword = 'AppleMockPassword123';
+        try {
+          await signInWithEmailAndPassword(auth, mockEmail, mockPassword);
+        } catch (signInErr) {
+          // If user doesn't exist, sign up the mock profile
+          if (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/invalid-credential') {
+            try {
+              await createUserWithEmailAndPassword(auth, mockEmail, mockPassword);
+            } catch (signUpErr) {
+              // If already created but threw other auth mismatch, fallback to sign in
+              await signInWithEmailAndPassword(auth, mockEmail, mockPassword);
+            }
+          } else {
+            throw signInErr;
+          }
+        }
+      } catch (err) {
+        console.warn('[Apple Mock Auth] failed, routing to Phone/Email:', err.message);
+        navigation.navigate('PhoneEmail', { isLogin: true });
+      } finally {
+        setSocialLoading(false);
+      }
+    } else {
+      Alert.alert(
+        `${platform} Login`,
+        `Connecting to ${platform} sandbox authentication...`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => navigation.navigate('PhoneEmail', { isLogin: true }) }
+        ]
+      );
+    }
   };
 
   return (
@@ -197,7 +255,11 @@ export default function WelcomeScreen({ navigation }) {
 
             {/* Social Buttons */}
             <View style={styles.socialRow}>
-              <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialLogin('Google')}>
+              <TouchableOpacity 
+                style={styles.socialBtn} 
+                disabled={!request}
+                onPress={() => promptAsync()}
+              >
                 <Ionicons name="logo-google" size={18} color="#EA4335" />
                 <Text style={styles.socialBtnText}>Google</Text>
               </TouchableOpacity>

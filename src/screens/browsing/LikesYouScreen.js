@@ -102,7 +102,14 @@ export default function LikesYouScreen({ navigation }) {
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.gradient}>
           <View style={styles.info}>
             <Text style={styles.name}>{isPremium ? item.name : 'Secret Admirer'}</Text>
-            {isPremium && <Text style={styles.age}>{item.age}</Text>}
+            {isPremium ? (
+              <Text style={styles.age}>{item.age}</Text>
+            ) : (
+              <Text style={styles.teaserText}>
+                {item.age ? `Age ${item.age}` : ''}
+                {item.location?.cityName ? ` · ${item.location.cityName}` : item.cityName ? ` · ${item.cityName}` : ''}
+              </Text>
+            )}
           </View>
         </LinearGradient>
       </TouchableOpacity>
@@ -178,9 +185,10 @@ const styles = StyleSheet.create({
   messageBadge: { position: 'absolute', top: '40%', left: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', padding: Spacing.sm, borderRadius: Radius.sm, flexDirection: 'row', alignItems: 'flex-start', gap: 4, zIndex: 10 },
   messageBadgeText: { color: '#fff', fontSize: 11, fontWeight: '600', flex: 1, fontStyle: 'italic' },
   gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%', justifyContent: 'flex-end', padding: Spacing.md },
-  info: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  info: { flexDirection: 'column', alignItems: 'flex-start', width: '100%' },
   name: { fontSize: 16, fontWeight: '700', color: Colors.white },
-  age: { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
+  age: { fontSize: 14, color: 'rgba(255,255,255,0.9)', marginTop: 2 },
+  teaserText: { fontSize: 12, color: 'rgba(255, 255, 255, 0.85)', fontWeight: '600', marginTop: 2 },
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, backgroundColor: 'rgba(255,255,255,0.85)' },
   upgradeBtn: { borderRadius: Radius.full, overflow: 'hidden', ...Shadow.md },
   upgradeGradient: { paddingVertical: Spacing.md, alignItems: 'center' },

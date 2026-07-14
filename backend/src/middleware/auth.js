@@ -16,8 +16,23 @@ async function requireAuth(req, res, next) {
       return res.status(401).json({ success: false, error: "Missing bearer token" });
     }
 
-    // Verify the real Firebase token
-    const decoded = await admin.auth().verifyIdToken(token);
+    let decoded;
+    try {
+      if (!admin.apps.length && process.env.NODE_ENV === "development") {
+        // Dev fallback for QA/Testing without Firebase service account
+        console.warn("[auth] DEV MODE: Mocking Firebase token verification");
+        decoded = {
+          uid: token === "test_token" ? "mock_user_1" : "mock_" + token.substring(0, 10),
+          phone_number: "+15555555555"
+        };
+      } else {
+        decoded = await admin.auth().verifyIdToken(token);
+      }
+    } catch (verifyErr) {
+      console.error("[auth] Firebase verification failed:", verifyErr.message);
+      return res.status(401).json({ success: false, error: "Invalid or expired Firebase token" });
+    }
+    
     req.firebaseUser = decoded;
 
     let dbUser = await User.findOne({ where: { firebaseUid: decoded.uid } });
@@ -27,7 +42,7 @@ async function requireAuth(req, res, next) {
       // Profile completion (name, photos, bio, etc.) happens via PATCH /users/:id.
       dbUser = await User.create({
         firebaseUid: decoded.uid,
-        phone: decoded.phone_number || "unknown",
+        phone: decoded.phone_number || null,
         profileCompleted: false,
       });
     }

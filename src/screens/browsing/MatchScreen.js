@@ -24,14 +24,19 @@ export default function MatchScreen({ route, navigation }) {
   // Heart badge pulse animation
   const pulse = useRef(new Animated.Value(1)).current;
 
-  // Drifting hearts particles animation values
-  const hearts = Array.from({ length: 6 }).map((_, i) => ({
-    y: useRef(new Animated.Value(0)).current,
-    x: 30 + Math.random() * (width - 80),
-    opacity: useRef(new Animated.Value(0)).current,
-    delay: i * 700,
-    scale: 0.7 + Math.random() * 0.5,
-  }));
+  // Drifting hearts particles animation values - initialized once inside a single useRef to avoid Hook rule violation
+  const heartsRef = useRef(
+    Array.from({ length: 12 }).map((_, i) => ({
+      y: new Animated.Value(0),
+      x: 30 + Math.random() * (width - 80),
+      xOffset: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+      delay: i * 350,
+      scale: 0.4 + Math.random() * 0.8,
+      emoji: ['💖', '💝', '💕', '❤️', '💜', '✨', '🌸'][i % 7],
+    }))
+  );
+  const hearts = heartsRef.current;
 
   useEffect(() => {
     // Initial entrance animations
@@ -75,11 +80,17 @@ export default function MatchScreen({ route, navigation }) {
       const animateHeart = () => {
         heart.y.setValue(0);
         heart.opacity.setValue(0);
+        heart.xOffset.setValue(0);
+        
         Animated.sequence([
           Animated.delay(heart.delay),
           Animated.parallel([
             Animated.timing(heart.opacity, { toValue: 0.85, duration: 400, useNativeDriver: true }),
-            Animated.timing(heart.y, { toValue: -280 - Math.random() * 100, duration: 2800, useNativeDriver: true }),
+            Animated.timing(heart.y, { toValue: -320 - Math.random() * 120, duration: 3200, useNativeDriver: true }),
+            Animated.sequence([
+              Animated.timing(heart.xOffset, { toValue: 1, duration: 1600, useNativeDriver: true }),
+              Animated.timing(heart.xOffset, { toValue: -1, duration: 1600, useNativeDriver: true }),
+            ]),
           ]),
           Animated.timing(heart.opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
         ]).start(() => {
@@ -99,28 +110,38 @@ export default function MatchScreen({ route, navigation }) {
 
       {/* Drifting Hearts Overlay */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {hearts.map((heart, idx) => (
-          <Animated.Text
-            key={idx}
-            style={[
-              styles.floatingHeart,
-              {
-                left: heart.x,
-                transform: [{ translateY: heart.y }, { scale: heart.scale }],
-                opacity: heart.opacity,
-              },
-            ]}
-          >
-            💜
-          </Animated.Text>
-        ))}
+        {hearts.map((heart, idx) => {
+          const translateX = heart.xOffset.interpolate({
+            inputRange: [-1, 1],
+            outputRange: [-35, 35],
+          });
+          return (
+            <Animated.Text
+              key={idx}
+              style={[
+                styles.floatingHeart,
+                {
+                  left: heart.x,
+                  transform: [
+                    { translateY: heart.y },
+                    { translateX },
+                    { scale: heart.scale },
+                  ],
+                  opacity: heart.opacity,
+                },
+              ]}
+            >
+              {heart.emoji}
+            </Animated.Text>
+          );
+        })}
       </View>
 
       <Animated.View style={[styles.content, { opacity, paddingTop: insets.top }]}>
         {/* Celebration Title */}
         <Animated.View style={[styles.headerSection, { transform: [{ scale }] }]}>
           <Text style={styles.title}>It's a Match!</Text>
-          <Text style={styles.subtitle}>You and {profile.name} have liked each other.</Text>
+          <Text style={styles.subtitle}>You and {matchProfile?.name || 'someone'} have liked each other.</Text>
         </Animated.View>
 
         {/* Overlapping Floating Avatars */}

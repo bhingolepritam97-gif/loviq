@@ -1,5 +1,10 @@
-// Mock RevenueCat Service for Expo Go compatibility
-// In a real app with a dev client, you would import 'react-native-purchases'
+// Hybrid RevenueCat Service Adapter
+// Supports native 'react-native-purchases' inside development clients
+// while falling back gracefully in Expo Go sandbox clients to avoid crashing.
+import { Platform } from 'react-native';
+
+const API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS || 'goog_pHDyZivGMcHIsbVwZlGlaqVvExq';
+const API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID || 'goog_pHDyZivGMcHIsbVwZlGlaqVvExq';
 
 const MOCK_PACKAGES = [
   { identifier: 'gold_yearly', packageType: 'ANNUAL', product: { title: 'Vela Gold (1 Year)', priceString: '$59.99', description: 'Billed annually at $4.99/mo' } },
@@ -7,13 +12,24 @@ const MOCK_PACKAGES = [
   { identifier: 'gold_monthly', packageType: 'MONTHLY', product: { title: 'Vela Gold (1 Month)', priceString: '$12.99', description: 'Billed monthly' } },
 ];
 
-export const Purchases = {
+let PurchasesSDK = null;
+let isNativeSupported = false;
+
+try {
+  // Synchronous require to load package only if present in runtime context
+  PurchasesSDK = require('react-native-purchases').default;
+  isNativeSupported = true;
+  console.log('[RevenueCat] Native SDK detected and loaded successfully.');
+} catch (e) {
+  console.log('[RevenueCat] Native purchases SDK not found (Expo Go runtime). Loading mock wrapper.');
+}
+
+const mockPurchases = {
   configure: ({ apiKey, appUserID }) => {
-    console.log(`[RevenueCat] Configured with user: ${appUserID}`);
+    console.log(`[RevenueCat Mock] Configured with user: ${appUserID}`);
   },
   
   getOfferings: async () => {
-    // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 500));
     return {
       current: {
@@ -23,9 +39,8 @@ export const Purchases = {
   },
   
   purchasePackage: async (pkg) => {
-    console.log(`[RevenueCat] Purchasing package: ${pkg.identifier}`);
+    console.log(`[RevenueCat Mock] Purchasing package: ${pkg.identifier}`);
     await new Promise(resolve => setTimeout(resolve, 1000));
-    // Simulate successful purchase and updated customer info
     return {
       customerInfo: {
         entitlements: {
@@ -40,8 +55,29 @@ export const Purchases = {
   getCustomerInfo: async () => {
     return {
       entitlements: {
-        active: {} // Empty by default for mock
+        active: {}
       }
     };
   }
 };
+
+export const configureRevenueCat = (appUserID) => {
+  if (isNativeSupported && PurchasesSDK) {
+    const apiKey = Platform.select({
+      ios: API_KEY_IOS,
+      android: API_KEY_ANDROID,
+      default: '',
+    });
+    if (apiKey) {
+      try {
+        PurchasesSDK.configure({ apiKey, appUserID });
+      } catch (err) {
+        console.warn('[RevenueCat] Failed to configure Purchases:', err.message);
+      }
+    }
+  } else {
+    mockPurchases.configure({ apiKey: 'mock', appUserID });
+  }
+};
+
+export const Purchases = isNativeSupported && PurchasesSDK ? PurchasesSDK : mockPurchases;

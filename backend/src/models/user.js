@@ -18,8 +18,8 @@ const User = sequelize.define(
     },
     phone: {
       type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
+      allowNull: true,
+      unique: false,
     },
     name: {
       type: DataTypes.STRING(50),
@@ -72,11 +72,38 @@ const User = sequelize.define(
       allowNull: true,
       field: "expo_push_token",
     },
+    isPremium: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "is_premium",
+    },
+    isVerified: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "is_verified",
+    },
+    cityName: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      field: "city_name",
+    },
+    hideDistance: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "hide_distance",
+    },
   },
   {
     tableName: "users",
     underscored: true,
     timestamps: true,
+    indexes: [
+      {
+        name: 'users_location_gist',
+        fields: ['location'],
+        using: 'GIST',
+      },
+    ],
   }
 );
 

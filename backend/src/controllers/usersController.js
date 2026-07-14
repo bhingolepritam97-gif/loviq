@@ -10,12 +10,25 @@ const profileUpdateSchema = z.object({
   interests: z.array(z.string()).max(10).optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
+  photos: z.array(z.string()).optional(),
+  cityName: z.string().optional(),
+  isActive: z.boolean().optional(),       // Pause/resume account visibility
+  hideDistance: z.boolean().optional(),   // Hide exact distance from other users
 });
 
 function isAdult(birthdateStr) {
   const birth = new Date(birthdateStr);
   const age = (Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
   return age >= 18;
+}
+
+// GET /users/me
+async function getCurrentUser(req, res) {
+  const user = await User.findByPk(req.dbUser.id, {
+    include: [{ model: Photo, as: "photos", order: [["order", "ASC"]] }],
+  });
+  if (!user) return res.status(404).json({ success: false, error: "User not found" });
+  res.json({ success: true, user });
 }
 
 // GET /users/:id
@@ -32,48 +45,78 @@ async function getUser(req, res) {
   res.json({ success: true, user });
 }
 
+async function _performProfileUpdate(user, reqBody, res) {
+  try {
+    const parsed = profileUpdateSchema.safeParse(reqBody);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: parsed.error.flatten() });
+    }
+    const data = parsed.data;
+
+    if (data.birthdate && !isAdult(data.birthdate)) {
+      return res.status(400).json({ success: false, error: "Must be 18 or older" });
+    }
+
+    const updates = { ...data };
+    delete updates.latitude;
+    delete updates.longitude;
+    delete updates.photos;
+
+    if (data.latitude != null && data.longitude != null) {
+      updates.location = sequelize.fn(
+        "ST_SetSRID",
+        sequelize.fn("ST_MakePoint", data.longitude, data.latitude),
+        4326
+      );
+    }
+
+    // Wrap everything in a transaction so if photo creation fails, we don't end up with 0 photos
+    await sequelize.transaction(async (t) => {
+      await user.update(updates, { transaction: t });
+
+      if (data.photos) {
+        await Photo.destroy({ where: { userId: user.id }, transaction: t });
+        const photoPromises = data.photos.map((url, i) => 
+          Photo.create({
+            userId: user.id,
+            url,
+            order: i,
+            moderationStatus: 'approved',
+          }, { transaction: t })
+        );
+        await Promise.all(photoPromises);
+      }
+    });
+
+    // Mark profile complete once the required fields are all present.
+    const refreshed = await User.findByPk(user.id, {
+      include: [{ model: Photo, as: "photos", order: [["order", "ASC"]] }],
+    });
+    const hasRequiredFields =
+      refreshed.name && refreshed.birthdate && refreshed.gender && refreshed.photos.length > 0;
+
+    if (hasRequiredFields && !refreshed.profileCompleted) {
+      await refreshed.update({ profileCompleted: true });
+    }
+
+    return res.json({ success: true, user: refreshed });
+  } catch (error) {
+    console.error("[usersController] Profile update error:", error);
+    return res.status(500).json({ success: false, error: "Failed to update profile" });
+  }
+}
+
+// PATCH /users/me
+async function updateCurrentUser(req, res) {
+  return _performProfileUpdate(req.dbUser, req.body, res);
+}
+
 // PATCH /users/:id
 async function updateUser(req, res) {
   if (req.params.id !== req.dbUser.id) {
     return res.status(403).json({ success: false, error: "Forbidden" });
   }
-
-  const parsed = profileUpdateSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ success: false, error: parsed.error.flatten() });
-  }
-  const data = parsed.data;
-
-  if (data.birthdate && !isAdult(data.birthdate)) {
-    return res.status(400).json({ success: false, error: "Must be 18 or older" });
-  }
-
-  const updates = { ...data };
-  delete updates.latitude;
-  delete updates.longitude;
-
-  if (data.latitude != null && data.longitude != null) {
-    updates.location = sequelize.fn(
-      "ST_SetSRID",
-      sequelize.fn("ST_MakePoint", data.longitude, data.latitude),
-      4326
-    );
-  }
-
-  await req.dbUser.update(updates);
-
-  // Mark profile complete once the required fields are all present.
-  const refreshed = await User.findByPk(req.dbUser.id, {
-    include: [{ model: Photo, as: "photos" }],
-  });
-  const hasRequiredFields =
-    refreshed.name && refreshed.birthdate && refreshed.gender && refreshed.photos.length > 0;
-
-  if (hasRequiredFields && !refreshed.profileCompleted) {
-    await refreshed.update({ profileCompleted: true });
-  }
-
-  res.json({ success: true, user: refreshed });
+  return _performProfileUpdate(req.dbUser, req.body, res);
 }
 
 // DELETE /users/:id  (soft-delete by default; ?hard=true for permanent)
@@ -199,6 +242,47 @@ async function blockUser(req, res) {
   }
 }
 
+// GET /users/:id/blocks
+async function getBlocks(req, res) {
+  if (req.params.id !== req.dbUser.id) {
+    return res.status(403).json({ success: false, error: "Forbidden" });
+  }
+
+  const { Block } = require("../models");
+
+  try {
+    const blocks = await Block.findAll({
+      where: { blockerId: req.dbUser.id },
+      include: [{ model: User, as: 'blocked', attributes: ['id', 'name', 'phone'] }],
+      order: [['createdAt', 'DESC']],
+    });
+    res.json({ success: true, blocks });
+  } catch (err) {
+    console.error("Get blocks error:", err);
+    res.status(500).json({ success: false, error: "Failed to fetch blocked users" });
+  }
+}
+
+// DELETE /users/:id/block/:blockedId
+async function unblockUser(req, res) {
+  if (req.params.id !== req.dbUser.id) {
+    return res.status(403).json({ success: false, error: "Forbidden" });
+  }
+  const { blockedId } = req.params;
+  const { Block } = require("../models");
+
+  try {
+    const deleted = await Block.destroy({
+      where: { blockerId: req.dbUser.id, blockedId },
+    });
+    if (deleted === 0) return res.status(404).json({ success: false, error: "Block not found" });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Unblock error:", err);
+    res.status(500).json({ success: false, error: "Failed to unblock user" });
+  }
+}
+
 // POST /users/:id/report
 async function reportUser(req, res) {
   if (req.params.id !== req.dbUser.id) {
@@ -222,4 +306,4 @@ async function reportUser(req, res) {
   }
 }
 
-module.exports = { getUser, updateUser, deleteUser, addPhoto, deletePhoto, reorderPhotos, updatePushToken, blockUser, reportUser };
+module.exports = { getCurrentUser, updateCurrentUser, getUser, updateUser, deleteUser, addPhoto, deletePhoto, reorderPhotos, updatePushToken, blockUser, unblockUser, getBlocks, reportUser };

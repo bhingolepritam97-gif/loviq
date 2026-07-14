@@ -6,8 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
-import { collection, query, limit, getDocs } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { getPotentialMatches } from '../../services/DiscoverService';
 
 const { width } = Dimensions.get('window');
 const cardWidth = width / 2 - Spacing.lg * 1.5;
@@ -20,25 +19,20 @@ export default function ExploreScreen({ navigation }) {
 
   useEffect(() => {
     const fetchTopPicks = async () => {
+      if (!user || !profile) return;
       try {
-        const q = query(collection(db, 'profiles'), limit(10));
-        const snapshot = await getDocs(q);
-        const picks = [];
-        snapshot.forEach(doc => {
-          if (doc.id !== user?.uid) {
-            picks.push({ id: doc.id, ...doc.data() });
-          }
-        });
-        setTopPicks(picks);
+        const picks = await getPotentialMatches(user.uid, profile, 100);
+        // limit to 10 for Top Picks grid curation
+        setTopPicks(picks.slice(0, 10));
       } catch (err) {
-        console.error('Error fetching top picks', err);
+        console.error('Error fetching top picks from Postgres:', err);
       } finally {
         setLoading(false);
       }
     };
     
     fetchTopPicks();
-  }, [user]);
+  }, [user, profile]);
 
   const isPremium = profile?.isPremium;
 
@@ -95,7 +89,7 @@ export default function ExploreScreen({ navigation }) {
                   key={pick.id} 
                   style={styles.pickCard}
                   activeOpacity={0.9}
-                  onPress={() => isPremium ? navigation.navigate('ProfileDetail', { profile: pick }) : navigation.navigate('Profile', { screen: 'Premium' })}
+                  onPress={() => navigation.navigate('ProfileDetail', { profile: pick })}
                 >
                   <Image source={{ uri: pick.photos?.[0] }} style={styles.pickImage} />
                   

@@ -4,6 +4,7 @@ import { auth } from '../config/firebase';
 import { getUserProfile, updateUserProfile } from '../services/UserService';
 import { registerForPushNotificationsAsync } from '../services/PushService';
 import { Purchases } from '../services/RevenueCatService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AuthContext = createContext();
 
@@ -11,6 +12,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null); // Firebase User
   const [profile, setProfile] = useState(null); // Firestore Profile
   const [loading, setLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState(false);
 
   useEffect(() => {
     // Only subscribe if auth is initialized successfully
@@ -28,10 +30,11 @@ export const AuthProvider = ({ children }) => {
       clearTimeout(safetyTimeout);
       if (firebaseUser) {
         setUser(firebaseUser);
+        setConnectionError(false);
         try {
           let userProfile = null;
 
-          // 4-second timeout limit for fetching profile from Firestore
+          // 4-second timeout limit for fetching profile from Postgres
           const fetchPromise = getUserProfile(firebaseUser.uid);
           const timeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Profile fetch timed out')), 4000)
@@ -45,7 +48,6 @@ export const AuthProvider = ({ children }) => {
           
           if (!userProfile) {
             try {
-              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
               const isLocalComplete = await AsyncStorage.getItem(`profileComplete_${firebaseUser.uid}`);
               if (isLocalComplete === 'true') {
                 userProfile = { 
@@ -59,10 +61,15 @@ export const AuthProvider = ({ children }) => {
             }
           }
           
-          setProfile(userProfile);
+          if (userProfile) {
+            setProfile(userProfile);
+            setConnectionError(false);
+          } else {
+            // Failed to load from network and no local storage backup exists
+            setConnectionError(true);
+          }
 
           // Configure RevenueCat and check entitlement in the background
-          // so network requests never block the authentication load
           if (userProfile) {
             (async () => {
               try {
@@ -84,10 +91,12 @@ export const AuthProvider = ({ children }) => {
           registerForPushNotificationsAsync();
         } catch (error) {
           console.warn("Error inside authStateChanged profile setup:", error.message);
+          setConnectionError(true);
         }
       } else {
         setUser(null);
         setProfile(null);
+        setConnectionError(false);
       }
       setLoading(false);
     });
@@ -97,13 +106,31 @@ export const AuthProvider = ({ children }) => {
 
   const refreshProfile = async () => {
     if (user) {
-      const userProfile = await getUserProfile(user.uid);
-      setProfile(userProfile);
+      setLoading(true);
+      setConnectionError(false);
+      try {
+        const fetchPromise = getUserProfile(user.uid);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile fetch timed out')), 4000)
+        );
+        const userProfile = await Promise.race([fetchPromise, timeoutPromise]);
+        if (userProfile) {
+          setProfile(userProfile);
+          setConnectionError(false);
+        } else {
+          setConnectionError(true);
+        }
+      } catch (err) {
+        console.warn('Refresh profile failed:', err.message);
+        setConnectionError(true);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, refreshProfile, setProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, connectionError, refreshProfile, setProfile }}>
       {children}
     </AuthContext.Provider>
   );

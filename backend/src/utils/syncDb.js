@@ -8,7 +8,7 @@ require("../models"); // registers associations
 
 async function main() {
   await sequelize.query("CREATE EXTENSION IF NOT EXISTS postgis;");
-  await sequelize.sync({ alter: true });
+  await sequelize.sync({ alter: process.env.NODE_ENV !== "production" });
   console.log("Database synced (tables created/updated, PostGIS enabled).");
   process.exit(0);
 }
