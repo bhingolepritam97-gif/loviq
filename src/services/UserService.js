@@ -1,120 +1,214 @@
-import { db } from '../config/firebase';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
+import { apiClient } from '../api/client';
+
+function mapBackendUserToProfile(u) {
+  if (!u) return null;
+  
+  // Compute age from birthdate
+  let age = 28; // default fallback
+  if (u.birthdate) {
+    const birth = new Date(u.birthdate);
+    age = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+  }
+
+  // Extract photos URLs in correct order
+  let photos = [];
+  if (u.photos && Array.isArray(u.photos)) {
+    photos = [...u.photos]
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map(p => p.url);
+  }
+
+  // Map genderPreference to interestedIn
+  let interestedIn = 'Everyone';
+  if (u.genderPreference && u.genderPreference.length > 0) {
+    interestedIn = u.genderPreference[0];
+  }
+
+  return {
+    id: u.id, // the backend database UUID
+    firebaseUid: u.firebaseUid,
+    name: u.name || '',
+    displayName: u.name || '',
+    age,
+    birthdate: u.birthdate,
+    gender: u.gender || '',
+    interestedIn,
+    bio: u.bio || '',
+    interests: u.interests || [],
+    location: u.location ? {
+      latitude: u.location.coordinates?.[1] || 0,
+      longitude: u.location.coordinates?.[0] || 0,
+    } : null,
+    photos,
+    isPremium: u.isPremium || false,
+    profileComplete: u.profileCompleted || false,
+    isVerified: u.isVerified || false,
+    cityName: u.cityName || '',
+    isActive: u.isActive !== undefined ? u.isActive : (u.is_active !== undefined ? u.is_active : true),
+    hideDistance: u.hideDistance !== undefined ? u.hideDistance : (u.hide_distance !== undefined ? u.hide_distance : false),
+  };
+}
 
 export const getUserProfile = async (uid) => {
-  if (!uid) return null;
   try {
-    const docRef = doc(db, 'profiles', uid);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
+    const response = await apiClient('/users/me');
+    if (response.success && response.user) {
+      return mapBackendUserToProfile(response.user);
     }
     return null;
   } catch (err) {
-    console.warn('Error fetching user profile from Firestore (possibly offline):', err.message);
+    console.warn('Error fetching user profile from backend REST API:', err.message);
     return null;
   }
 };
 
 export const createUserProfile = async (uid, data) => {
-  if (!uid) return;
-  try {
-    const docRef = doc(db, 'profiles', uid);
-    const defaults = {
-      eloScore: 1500,
-      swipeStats: { totalSwipes: 0, rightSwipes: 0 },
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(docRef, { ...defaults, ...data }, { merge: true });
-  } catch (err) {
-    console.warn('Error creating user profile in Firestore:', err.message);
-  }
+  return await updateUserProfile(uid, data);
 };
 
 export const updateUserProfile = async (uid, data) => {
-  if (!uid) return;
+  if (!uid) return null;
+  
+  const payload = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.displayName !== undefined) payload.name = data.displayName;
+  
+  if (data.birthdate !== undefined) {
+    payload.birthdate = data.birthdate;
+  } else if (data.age !== undefined) {
+    const year = new Date().getFullYear() - data.age;
+    payload.birthdate = `${year}-01-01`;
+  }
+  
+  if (data.gender !== undefined) payload.gender = data.gender;
+  if (data.interestedIn !== undefined) {
+    payload.genderPreference = [data.interestedIn];
+  }
+  if (data.bio !== undefined) payload.bio = data.bio;
+  if (data.interests !== undefined) payload.interests = data.interests;
+  if (data.photos !== undefined) payload.photos = data.photos;
+  if (data.isPremium !== undefined) payload.isPremium = data.isPremium;
+  if (data.isVerified !== undefined) payload.isVerified = data.isVerified;
+  if (data.isActive !== undefined) payload.isActive = data.isActive;
+  if (data.hideDistance !== undefined) payload.hideDistance = data.hideDistance;
+  
+  const lat = data.location?.latitude !== undefined ? data.location.latitude : data.latitude;
+  const lng = data.location?.longitude !== undefined ? data.location.longitude : data.longitude;
+  if (lat !== undefined && lng !== undefined) {
+    payload.latitude = lat;
+    payload.longitude = lng;
+  }
+  
+  const city = data.location?.cityName !== undefined ? data.location.cityName : data.cityName;
+  if (city !== undefined) {
+    payload.cityName = city;
+  }
+  
   try {
-    const docRef = doc(db, 'profiles', uid);
-    await updateDoc(docRef, { ...data, updatedAt: new Date().toISOString() });
+    const response = await apiClient('/users/me', {
+      method: 'PATCH',
+      body: payload
+    });
+    if (response.success && response.user) {
+      return mapBackendUserToProfile(response.user);
+    }
+    return null;
   } catch (err) {
-    console.warn('Error updating user profile in Firestore:', err.message);
+    console.warn('Error updating user profile in backend:', err.message);
+    return null;
   }
 };
 
 export const upgradeToPremium = async (uid) => {
-  if (!uid) return false;
   try {
-    const docRef = doc(db, 'profiles', uid);
-    await updateDoc(docRef, { 
-      isPremium: true,
-      premiumSince: new Date().toISOString() 
+    const response = await apiClient('/users/me', {
+      method: 'PATCH',
+      body: { isPremium: true }
     });
-    return true;
+    return response.success;
   } catch (err) {
-    console.error('Error upgrading to premium:', err);
+    console.error('Error upgrading to premium in backend:', err);
+    return false;
+  }
+};
+
+export const verifyUser = async (uid, method = 'photo_selfie') => {
+  try {
+    const response = await apiClient('/users/me', {
+      method: 'PATCH',
+      body: { isVerified: true }
+    });
+    return response.success;
+  } catch (err) {
+    console.error('Error verifying user in backend:', err);
     return false;
   }
 };
 
 export const blockUser = async (myUid, blockedId) => {
-  if (!myUid || !blockedId) return false;
   try {
-    const docRef = doc(db, 'profiles', myUid);
-    await updateDoc(docRef, {
-      blockedUsers: arrayUnion(blockedId)
+    const response = await apiClient(`/users/${myUid}/block`, {
+      method: 'POST',
+      body: { blockedId }
     });
-    return true;
+    return response.success;
   } catch (err) {
-    console.error('Error blocking user in Firestore:', err);
+    console.error('Error blocking user in backend:', err);
+    return false;
+  }
+};
+
+export const getBlockedUsers = async (myUid) => {
+  try {
+    const response = await apiClient(`/users/${myUid}/blocks`);
+    if (response.success && response.blocks) {
+      return response.blocks.map(b => ({
+        id: b.blockedId,
+        name: b.blocked?.name || 'Unknown',
+        phone: b.blocked?.phone || 'No phone',
+      }));
+    }
+    return [];
+  } catch (err) {
+    console.error('Error fetching blocked users:', err);
+    return [];
+  }
+};
+
+export const unblockUser = async (myUid, blockedId) => {
+  try {
+    const response = await apiClient(`/users/${myUid}/block/${blockedId}`, {
+      method: 'DELETE'
+    });
+    return response.success;
+  } catch (err) {
+    console.error('Error unblocking user:', err);
     return false;
   }
 };
 
 export const reportUser = async (myUid, reportedId, reason) => {
-  if (!myUid || !reportedId || !reason) return false;
   try {
-    const reportRef = doc(db, 'reports', `${myUid}_${reportedId}`);
-    await setDoc(reportRef, {
-      reporterId: myUid,
-      reportedId: reportedId,
-      reason: reason,
-      timestamp: new Date().toISOString()
+    const response = await apiClient(`/users/${myUid}/report`, {
+      method: 'POST',
+      body: { reportedId, reason }
     });
-    await blockUser(myUid, reportedId);
-    return true;
+    return response.success;
   } catch (err) {
-    console.error('Error reporting user in Firestore:', err);
+    console.error('Error reporting user in backend:', err);
     return false;
   }
 };
 
-export const verifyUser = async (uid) => {
-  if (!uid) return false;
+export const unmatchUser = async (myUid, matchId) => {
   try {
-    const docRef = doc(db, 'profiles', uid);
-    await updateDoc(docRef, {
-      isVerified: true,
-      updatedAt: new Date().toISOString()
+    // Note: matchId must be the UUID of the Match record, not the target user's UUID.
+    const response = await apiClient(`/matches/${matchId}/unmatch`, {
+      method: 'POST'
     });
-    return true;
+    return response.success;
   } catch (err) {
-    console.error('Error verifying user in Firestore:', err);
-    return false;
-  }
-};
-
-export const unmatchUser = async (myUid, matchUid) => {
-  if (!myUid || !matchUid) return false;
-  try {
-    const matchId = [myUid, matchUid].sort().join('_');
-    const matchRef = doc(db, 'matches', matchId);
-    await deleteDoc(matchRef);
-    
-    // Also block the user to prevent them from showing up again
-    await blockUser(myUid, matchUid);
-    return true;
-  } catch (err) {
-    console.error('Error unmatching user in Firestore:', err);
+    console.error('Error unmatching user in backend:', err);
     return false;
   }
 };

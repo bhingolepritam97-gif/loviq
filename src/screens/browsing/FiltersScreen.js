@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, PanResponder } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography, Spacing, Radius } from '../../theme';
+import { Colors, Typography, Spacing, Radius, Shadow } from '../../theme';
 import Button from '../../components/Button';
 import Chip from '../../components/Chip';
 import { ALL_INTERESTS } from '../../data/constants';
@@ -9,6 +9,102 @@ import { useAuth } from '../../context/AuthContext';
 
 const GENDERS = ['Women', 'Men', 'Everyone'];
 
+// ─── Custom Pure JS Single Slider ──────────────────────────────────────────────
+const SingleSlider = ({ min, max, value, onChange }) => {
+  const [width, setWidth] = useState(0);
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        if (width === 0) return;
+        const locationX = evt.nativeEvent.locationX;
+        const percent = Math.max(0, Math.min(1, locationX / width));
+        const val = Math.round(min + percent * (max - min));
+        onChange(val);
+      },
+      onPanResponderMove: (evt) => {
+        if (width === 0) return;
+        const locationX = evt.nativeEvent.locationX;
+        const percent = Math.max(0, Math.min(1, locationX / width));
+        const val = Math.round(min + percent * (max - min));
+        onChange(val);
+      },
+    })
+  ).current;
+
+  const percent = (value - min) / (max - min);
+
+  return (
+    <View 
+      style={styles.sliderTrackContainer} 
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      {...panResponder.panHandlers}
+    >
+      <View style={styles.sliderTrackBackground} />
+      <View style={[styles.sliderTrackActive, { width: `${percent * 100}%` }]} />
+      <View style={[styles.sliderThumb, { left: `${percent * 100}%`, transform: [{ translateX: -12 }] }]} />
+    </View>
+  );
+};
+
+// ─── Custom Pure JS Double Slider ──────────────────────────────────────────────
+const DoubleSlider = ({ min, max, values, onChange }) => {
+  const [width, setWidth] = useState(0);
+  const activeThumb = useRef(null); // 'min' | 'max' | null
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        if (width === 0) return;
+        const locationX = evt.nativeEvent.locationX;
+        const percent = locationX / width;
+        const clickVal = min + percent * (max - min);
+        
+        const distMin = Math.abs(clickVal - values[0]);
+        const distMax = Math.abs(clickVal - values[1]);
+        activeThumb.current = distMin < distMax ? 'min' : 'max';
+      },
+      onPanResponderMove: (evt) => {
+        if (width === 0 || !activeThumb.current) return;
+        const locationX = evt.nativeEvent.locationX;
+        const percent = Math.max(0, Math.min(1, locationX / width));
+        const val = Math.round(min + percent * (max - min));
+        
+        if (activeThumb.current === 'min') {
+          const newMin = Math.max(min, Math.min(val, values[1] - 2));
+          onChange([newMin, values[1]]);
+        } else {
+          const newMax = Math.min(max, Math.max(val, values[0] + 2));
+          onChange([values[0], newMax]);
+        }
+      },
+      onPanResponderRelease: () => {
+        activeThumb.current = null;
+      },
+    })
+  ).current;
+
+  const pctMin = (values[0] - min) / (max - min);
+  const pctMax = (values[1] - min) / (max - min);
+
+  return (
+    <View 
+      style={styles.sliderTrackContainer} 
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      {...panResponder.panHandlers}
+    >
+      <View style={styles.sliderTrackBackground} />
+      <View style={[styles.sliderTrackActiveRange, { left: `${pctMin * 100}%`, right: `${(1 - pctMax) * 100}%` }]} />
+      <View style={[styles.sliderThumb, { left: `${pctMin * 100}%`, transform: [{ translateX: -12 }] }]} />
+      <View style={[styles.sliderThumb, { left: `${pctMax * 100}%`, transform: [{ translateX: -12 }] }]} />
+    </View>
+  );
+};
+
+// ─── Main Component ────────────────────────────────────────────────────────────
 export default function FiltersScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { profile, setProfile } = useAuth();
@@ -32,8 +128,8 @@ export default function FiltersScreen({ navigation }) {
 
   const handleReset = () => {
     setGender('Everyone');
-    setDistance(100);
-    setAgeRange([18, 60]);
+    setDistance(50);
+    setAgeRange([18, 50]);
     setSelectedInterests([]);
   };
 
@@ -79,18 +175,7 @@ export default function FiltersScreen({ navigation }) {
             <Text style={styles.sectionTitle}>Maximum Distance</Text>
             <Text style={styles.valueText}>{distance} miles</Text>
           </View>
-          {/* Simple Mock Slider buttons for mock experience */}
-          <View style={styles.sliderMock}>
-            {[10, 25, 50, 100].map(dist => (
-              <TouchableOpacity
-                key={dist}
-                style={[styles.sliderOption, distance === dist && styles.sliderOptionActive]}
-                onPress={() => setDistance(dist)}
-              >
-                <Text style={[styles.sliderText, distance === dist && styles.sliderTextActive]}>{dist}m</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <SingleSlider min={5} max={100} value={distance} onChange={setDistance} />
         </View>
 
         {/* Age Range */}
@@ -99,17 +184,7 @@ export default function FiltersScreen({ navigation }) {
             <Text style={styles.sectionTitle}>Age Range</Text>
             <Text style={styles.valueText}>{ageRange[0]} - {ageRange[1]}</Text>
           </View>
-          <View style={styles.sliderMock}>
-            {[[18, 25], [20, 35], [25, 45], [30, 60]].map(([min, max]) => (
-              <TouchableOpacity
-                key={min}
-                style={[styles.sliderOption, ageRange[0] === min && styles.sliderOptionActive]}
-                onPress={() => setAgeRange([min, max])}
-              >
-                <Text style={[styles.sliderText, ageRange[0] === min && styles.sliderTextActive]}>{min}-{max}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <DoubleSlider min={18} max={65} values={ageRange} onChange={setAgeRange} />
         </View>
 
         {/* Filter by interests */}
@@ -153,11 +228,13 @@ const styles = StyleSheet.create({
   genderButtonActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '12' },
   genderText: { fontSize: Typography.fontSize.sm, fontWeight: '600', color: Colors.textMuted },
   genderTextActive: { color: Colors.primary },
-  sliderMock: { flexDirection: 'row', gap: Spacing.sm },
-  sliderOption: { flex: 1, paddingVertical: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, alignItems: 'center' },
-  sliderOptionActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '08' },
-  sliderText: { fontSize: 13, color: Colors.textMuted },
-  sliderTextActive: { color: Colors.primary, fontWeight: '700' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: Spacing['2xl'], paddingTop: Spacing.md, backgroundColor: Colors.background },
+
+  // Slider Styles
+  sliderTrackContainer: { height: 40, justifyContent: 'center', marginVertical: Spacing.sm, position: 'relative' },
+  sliderTrackBackground: { height: 6, borderRadius: 3, backgroundColor: Colors.border },
+  sliderTrackActive: { position: 'absolute', height: 6, borderRadius: 3, backgroundColor: Colors.primary },
+  sliderTrackActiveRange: { position: 'absolute', height: 6, borderRadius: 3, backgroundColor: Colors.primary },
+  sliderThumb: { position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.primary, ...Shadow.sm }
 });

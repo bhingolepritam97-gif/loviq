@@ -23,15 +23,26 @@ module.exports = (sequelize) => {
         type: DataTypes.TEXT,
         allowNull: false,
       },
-      read: {
+      isRead: {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
+        field: "is_read",
+      },
+      readAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: "read_at",
       },
     },
     {
       tableName: "messages",
       underscored: true,
       timestamps: true,
+      indexes: [
+        {
+          fields: ["match_id", "created_at"],
+        },
+      ],
     }
   );
 

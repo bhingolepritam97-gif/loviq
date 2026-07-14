@@ -5,12 +5,16 @@ import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../th
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
-import { getPotentialMatches, recordSwipe } from '../../services/DiscoverService';
+import { subscribeToPotentialMatches, recordSwipe } from '../../services/DiscoverService';
+import { useDeferredOnboardingPrompts } from '../../hooks/useDeferredOnboardingPrompts';
+import { getGracePeriodStatus } from '../../utils/gracePeriod';
+import VerifiedBadge from '../../components/VerifiedBadge';
+import EmptyStateScreen from './EmptyStateScreen';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 0.28 * width;
 
-export default function DiscoverScreen({ navigation }) {
+export default function DiscoverScreen({ navigation, route }) {
   const [profiles, setProfiles] = useState([]);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -21,34 +25,94 @@ export default function DiscoverScreen({ navigation }) {
   const { user, profile } = useAuth();
 
   const [error, setError] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // Track daily likes (simplified for client-side demo)
   const [likesCount, setLikesCount] = useState(0);
   const FREE_DAILY_LIKES = 10;
 
-  const fetchProfiles = useCallback(async () => {
+  const [swipeCount, setSwipeCount] = useState(0);
+  const [inGracePeriod, setInGracePeriod] = useState(false);
+
+  // Check if this user is still in their free 24h window
+  useEffect(() => {
+    getGracePeriodStatus().then(setInGracePeriod);
+  }, []);
+
+  useDeferredOnboardingPrompts({
+    swipeCount,
+    hasMatched: false,
+    signupTimestamp: user?.metadata?.creationTime ? new Date(user.metadata.creationTime).getTime() : Date.now(),
+    hasPassword: false, 
+  });
+
+  const setupSubscription = useCallback(() => {
+    // If we have custom profiles passed in from EmptyStateScreen, use them directly
+    if (route?.params?.profiles && route.params.profiles.length > 0) {
+      setProfiles(route.params.profiles);
+      setLoading(false);
+      setError(null);
+      // Clear route params so it doesn't trigger again on subsequent focuses
+      navigation.setParams({ profiles: undefined });
+      return () => {};
+    }
+
     if (user && profile) {
       setLoading(true);
       setError(null);
-      try {
-        const potential = await getPotentialMatches(user.uid, profile);
-        setProfiles(potential);
-      } catch (err) {
-        console.error('Error fetching potential matches:', err);
-        setError('Failed to fetch nearby users. Please check your connection.');
-      } finally {
-        setLoading(false);
+      
+      // Auto-heal missing location coordinates
+      if (!profile.location || !profile.location.latitude) {
+        (async () => {
+          try {
+            const Location = require('expo-location');
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+              const loc = await Location.getCurrentPositionAsync({});
+              if (loc && loc.coords) {
+                const { updateUserProfile } = require('../../services/UserService');
+                let cityName = 'Pune';
+                try {
+                  const response = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+                  cityName = response?.[0]?.city || response?.[0]?.subregion || cityName;
+                } catch (e) {
+                  console.warn('Auto-heal reverse geocode failed:', e.message);
+                }
+                
+                await updateUserProfile(user.uid, {
+                  location: {
+                    latitude: loc.coords.latitude,
+                    longitude: loc.coords.longitude,
+                    cityName
+                  }
+                });
+                setRefreshTrigger(prev => prev + 1);
+              }
+            }
+          } catch (err) {
+            console.warn('Auto-healing location failed:', err.message);
+          }
+        })();
       }
+      
+      const unsubscribe = subscribeToPotentialMatches(user.uid, profile, (potential) => {
+        setProfiles(potential);
+        setLoading(false);
+      });
+      
+      return unsubscribe;
     } else {
       setLoading(false);
+      return () => {};
     }
-  }, [user, profile]);
+  }, [user, profile, refreshTrigger, route?.params?.profiles]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchProfiles();
+      const unsubscribe = setupSubscription();
       setActivePhotoIndex(0);
-    }, [fetchProfiles])
+      return () => unsubscribe();
+    }, [setupSubscription])
   );
 
   // Interpolation for active card rotate
@@ -142,8 +206,8 @@ export default function DiscoverScreen({ navigation }) {
   const forceSwipe = (direction) => {
     if (profiles.length === 0) return;
     
-    // Paywall Intercept for Likes
-    if (direction === 'right' && !profile?.isPremium && likesCount >= FREE_DAILY_LIKES) {
+    // Paywall Intercept for Likes — bypassed during 24h grace period
+    if (direction === 'right' && !profile?.isPremium && !inGracePeriod && likesCount >= FREE_DAILY_LIKES) {
       navigation.navigate('Profile', { screen: 'Premium' });
       resetPosition();
       return;
@@ -169,6 +233,7 @@ export default function DiscoverScreen({ navigation }) {
   };
 
   const onSwipeComplete = async (direction) => {
+    setSwipeCount(prev => prev + 1);
     const swipedProfile = profiles[0];
     setProfiles(prev => prev.slice(1));
     setActivePhotoIndex(0);
@@ -228,9 +293,19 @@ export default function DiscoverScreen({ navigation }) {
   const renderCardStack = () => {
     if (loading) {
       return (
-        <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={[styles.emptySubtitle, { marginTop: Spacing.lg }]}>Finding people nearby...</Text>
+        <View style={styles.skeletonCard}>
+          <View style={styles.skeletonImage} />
+          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.scrim}>
+            <View style={styles.infoArea}>
+              <View style={styles.skeletonTitle} />
+              <View style={styles.skeletonText} />
+              <View style={styles.skeletonTextShort} />
+              <View style={styles.interestsRow}>
+                <View style={styles.skeletonChip} />
+                <View style={styles.skeletonChip} />
+              </View>
+            </View>
+          </LinearGradient>
         </View>
       );
     }
@@ -243,7 +318,7 @@ export default function DiscoverScreen({ navigation }) {
           <Text style={styles.emptySubtitle}>{error}</Text>
           <TouchableOpacity 
             style={styles.retryButton} 
-            onPress={fetchProfiles}
+            onPress={() => setRefreshTrigger(prev => prev + 1)}
           >
             <LinearGradient
               colors={Gradients.primary.colors}
@@ -260,38 +335,16 @@ export default function DiscoverScreen({ navigation }) {
 
     if (profiles.length === 0) {
       return (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>😢</Text>
-          <Text style={styles.emptyTitle}>No more profiles nearby</Text>
-          <Text style={styles.emptySubtitle}>You've seen everyone nearby — check back in 4 hours for new people!</Text>
-          <View style={{ flexDirection: 'column', gap: Spacing.md, marginTop: Spacing.md, width: '100%', alignItems: 'center' }}>
-            <TouchableOpacity 
-              style={[styles.retryButton, { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, width: 240 }]} 
-              onPress={() => {
-                setLoading(true);
-                setTimeout(() => fetchProfiles(), 800);
-              }}
-            >
-              <View style={[styles.retryButtonGradient, { backgroundColor: 'transparent' }]}>
-                <Text style={[styles.retryButtonText, { color: Colors.text }]}>Search up to 50 miles</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.retryButton, { width: 240 }]} 
-              onPress={fetchProfiles}
-            >
-              <LinearGradient
-                colors={Gradients.primary.colors}
-                start={Gradients.primary.start}
-                end={Gradients.primary.end}
-                style={styles.retryButtonGradient}
-              >
-                <Text style={styles.retryButtonText}>Refresh Stack</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <EmptyStateScreen
+          navigation={navigation}
+          inline={true}
+          route={{
+            params: {
+              currentRadius: profile?.distance_range ?? profile?.searchRadius ?? 25,
+              userLocation: profile?.location ?? null,
+            }
+          }}
+        />
       );
     }
 
@@ -367,7 +420,7 @@ export default function DiscoverScreen({ navigation }) {
               <Text style={styles.superLikeText}>SUPER LIKE</Text>
             </Animated.View>
 
-            {/* Profile Info overlay */}
+                {/* Profile Info overlay */}
             <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.scrim}>
               <TouchableOpacity 
                 activeOpacity={0.8}
@@ -376,10 +429,17 @@ export default function DiscoverScreen({ navigation }) {
               >
                 <View style={styles.nameRow}>
                   <Text style={styles.name}>{profile.name}, {profile.age}</Text>
-                  {profile.isVerified && <Text style={styles.verified}>✓</Text>}
+                  {/* VerifiedBadge replaces the old plain ✓ text character.
+                      Unverified gets a ghost badge so the contrast is obvious. */}
+                  <VerifiedBadge
+                    isVerified={!!profile.isVerified}
+                    size="sm"
+                    showLabel={false}
+                    style={{ marginLeft: 6, marginTop: 2 }}
+                  />
                 </View>
                 <Text style={styles.jobText}>{profile.job || 'Explorer'}</Text>
-                <Text style={styles.distanceText}>📍 {profile.distance} miles away</Text>
+                <Text style={styles.distanceText}>📍 {profile.cityName ? `${profile.cityName} · ` : ''}{profile.distance ? `${parseFloat(profile.distance).toFixed(1)} miles away` : 'Nearby'}</Text>
                 <Text style={styles.bioText} numberOfLines={2}>{profile.bio}</Text>
 
                 {/* Interest chips */}
@@ -596,4 +656,11 @@ const styles = StyleSheet.create({
   retryButton: { width: 160, borderRadius: Radius.full, overflow: 'hidden' },
   retryButtonGradient: { paddingVertical: Spacing.md, alignItems: 'center' },
   retryButtonText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
+  
+  skeletonCard: { width: '100%', height: '100%', borderRadius: Radius['2xl'], overflow: 'hidden', backgroundColor: Colors.border, position: 'absolute' },
+  skeletonImage: { width: '100%', height: '100%', backgroundColor: Colors.border },
+  skeletonTitle: { width: '60%', height: 32, borderRadius: Radius.sm, backgroundColor: 'rgba(255,255,255,0.2)', marginBottom: Spacing.sm },
+  skeletonText: { width: '80%', height: 16, borderRadius: Radius.sm, backgroundColor: 'rgba(255,255,255,0.2)', marginBottom: Spacing.xs },
+  skeletonTextShort: { width: '40%', height: 16, borderRadius: Radius.sm, backgroundColor: 'rgba(255,255,255,0.2)', marginBottom: Spacing.md },
+  skeletonChip: { width: 80, height: 28, borderRadius: Radius.full, backgroundColor: 'rgba(255,255,255,0.2)' },
 });

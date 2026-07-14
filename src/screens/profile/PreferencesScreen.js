@@ -91,12 +91,54 @@ export default function PreferencesScreen({ navigation }) {
             {[[18, 25], [20, 35], [25, 45], [30, 60]].map(([min, max]) => (
               <TouchableOpacity
                 key={min}
-                style={[styles.sliderOption, ageRange[0] === min && styles.sliderOptionActive]}
+                style={[styles.sliderOption, ageRange[0] === min && ageRange[1] === max && styles.sliderOptionActive]}
                 onPress={() => setAgeRange([min, max])}
               >
-                <Text style={[styles.sliderText, ageRange[0] === min && styles.sliderTextActive]}>{min}-{max}</Text>
+                <Text style={[styles.sliderText, ageRange[0] === min && ageRange[1] === max && styles.sliderTextActive]}>{min}-{max}</Text>
               </TouchableOpacity>
             ))}
+          </View>
+          
+          {/* Custom Sliders for min/max age range adjustment */}
+          <View style={{ marginTop: Spacing.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.xs }}>
+              <Text style={{ fontSize: 12, color: Colors.textMuted, fontWeight: '700' }}>Min Age: {ageRange[0]}</Text>
+              <Text style={{ fontSize: 12, color: Colors.textMuted, fontWeight: '700' }}>Max Age: {ageRange[1]}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <Slider
+                  minimumValue={18}
+                  maximumValue={75}
+                  step={1}
+                  value={ageRange[0]}
+                  onValueChange={(val) => {
+                    if (val <= ageRange[1]) {
+                      setAgeRange([val, ageRange[1]]);
+                    }
+                  }}
+                  minimumTrackTintColor={Colors.primary}
+                  maximumTrackTintColor={Colors.border}
+                  thumbTintColor={Colors.primary}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Slider
+                  minimumValue={18}
+                  maximumValue={75}
+                  step={1}
+                  value={ageRange[1]}
+                  onValueChange={(val) => {
+                    if (val >= ageRange[0]) {
+                      setAgeRange([ageRange[0], val]);
+                    }
+                  }}
+                  minimumTrackTintColor={Colors.primary}
+                  maximumTrackTintColor={Colors.border}
+                  thumbTintColor={Colors.primary}
+                />
+              </View>
+            </View>
           </View>
         </View>
 

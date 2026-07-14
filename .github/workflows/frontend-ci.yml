@@ -1,0 +1,40 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths-ignore:
+      - 'backend/**'
+  pull_request:
+    branches: [ "main", "master" ]
+    paths-ignore:
+      - 'backend/**'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: ./package-lock.json || ./package.json
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run ESLint
+      run: npm run lint
+      continue-on-error: true
+
+    # Uncomment when tests are added
+    # - name: Run Tests
+    #   run: npm test

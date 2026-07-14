@@ -8,16 +8,17 @@ import Input from '../../components/Input';
 import Avatar from '../../components/Avatar';
 import { useAuth } from '../../context/AuthContext';
 import { fetchMatchMessages, sendMessage, subscribeToMessages, updateTypingStatus, markMessagesAsRead } from '../../services/ChatService';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { socketService } from '../../api/socket';
 
 export default function ChatScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { matchId } = route.params || {};
   const [profile, setProfile] = useState(route.params?.profile || null);
   const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   const typingTimeoutRef = useRef(null);
   const flatListRef = useRef(null);
   const { user } = useAuth();
@@ -40,6 +41,7 @@ export default function ChatScreen({ route, navigation }) {
       // Initial fetch isn't strictly necessary with onSnapshot, but we keep it to populate quickly
       const fetched = await fetchMatchMessages(matchId);
       setMessages(fetched);
+      setLoading(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
       // Subscribe to real-time updates via Firestore
@@ -52,24 +54,25 @@ export default function ChatScreen({ route, navigation }) {
 
     loadData();
     
-    // Subscribe to match doc for typing status
-    const matchUnsubscribe = onSnapshot(doc(db, 'matches', matchId), (docSnap) => {
-      if (docSnap.exists() && profile) {
-        const data = docSnap.data();
-        if (data.typing && data.typing[profile.id]) {
-          setIsTyping(true);
-          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-        } else {
-          setIsTyping(false);
-        }
+    // Subscribe to typing status events via WebSocket
+    const socket = socketService.getSocket();
+    const handleTypingEvent = ({ senderId, isTyping }) => {
+      if (profile && senderId === profile.id) {
+        setIsTyping(isTyping);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       }
-    });
+    };
+    if (socket) {
+      socket.on("typing", handleTypingEvent);
+    }
 
     return () => {
       unsubscribe();
-      matchUnsubscribe();
+      if (socket) {
+        socket.off("typing", handleTypingEvent);
+      }
     };
-  }, [matchId]);
+  }, [matchId, profile]);
 
   const HARASSMENT_BLACKLIST = ['idiot', 'stupid', 'ugly', 'die', 'kill', 'bitch'];
 
@@ -162,6 +165,17 @@ export default function ChatScreen({ route, navigation }) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const handleScroll = (event) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    // Show button if we are more than 150px away from the bottom
+    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 150;
+    setShowScrollButton(!isCloseToBottom);
+  };
+
+  const scrollToBottom = () => {
+    flatListRef.current?.scrollToEnd({ animated: true });
+  };
+
   return (
     <KeyboardAvoidingView 
       style={[styles.container, { paddingTop: insets.top }]} 
@@ -197,66 +211,94 @@ export default function ChatScreen({ route, navigation }) {
       </View>
 
       {/* Messages Scroll Area */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={item => item.id}
-        keyboardDismissMode="on-drag"
-        renderItem={({ item }) => {
-          const isMe = item.senderId === user?.uid;
-          return (
-            <View style={[styles.messageWrapper, isMe ? styles.wrapperMe : styles.wrapperOther]}>
-              <View style={[styles.messageRow, isMe ? styles.rowMe : styles.rowOther]}>
-                {!isMe && (
-                  <Image source={{ uri: profile.photos?.[0] }} style={styles.bubbleAvatar} />
-                )}
-                
-                {isMe ? (
-                  <LinearGradient
-                    colors={Gradients.primary.colors}
-                    start={Gradients.primary.start}
-                    end={Gradients.primary.end}
-                    style={[styles.bubble, styles.bubbleMe]}
-                  >
-                    <Text style={[styles.bubbleText, styles.textMe]}>{item.text}</Text>
-                  </LinearGradient>
-                ) : (
-                  <View style={[styles.bubble, styles.bubbleOther]}>
-                    <Text style={[styles.bubbleText, styles.textOther]}>{item.text}</Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.timestampRow}>
-                <Text style={[styles.timestamp, isMe ? styles.timestampMe : styles.timestampOther]}>
-                  {formatTime(item.timestamp)}
-                </Text>
-                {isMe && (
-                  <Ionicons 
-                    name={item.read ? "checkmark-done" : "checkmark"} 
-                    size={14} 
-                    color={item.read ? Colors.primary : Colors.textMuted} 
-                    style={styles.readReceipt}
-                  />
-                )}
-              </View>
-            </View>
-          );
-        }}
-        ListFooterComponent={
-          isTyping ? (
-            <View style={[styles.messageWrapper, styles.wrapperOther, { marginBottom: Spacing.sm }]}>
-              <View style={[styles.messageRow, styles.rowOther]}>
-                <Image source={{ uri: profile.photos?.[0] }} style={styles.bubbleAvatar} />
-                <View style={[styles.bubble, styles.bubbleOther, { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm }]}>
-                  <Text style={[styles.bubbleText, styles.textOther, { fontStyle: 'italic', color: Colors.textMuted }]}>Typing...</Text>
+      {loading ? (
+        <View style={styles.skeletonContainer}>
+          {[1, 2, 3, 4, 5].map((item, index) => (
+            <View 
+              key={index} 
+              style={[
+                styles.skeletonBubble, 
+                index % 2 === 0 ? styles.skeletonOther : styles.skeletonMe,
+                { width: Math.random() * 100 + 100 }
+              ]} 
+            />
+          ))}
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={item => item.id}
+          keyboardDismissMode="on-drag"
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          renderItem={({ item }) => {
+            const isMe = item.senderId === user?.uid;
+            return (
+              <View style={[styles.messageWrapper, isMe ? styles.wrapperMe : styles.wrapperOther]}>
+                <View style={[styles.messageRow, isMe ? styles.rowMe : styles.rowOther]}>
+                  {!isMe && (
+                    <Image source={{ uri: profile.photos?.[0] }} style={styles.bubbleAvatar} />
+                  )}
+                  
+                  {isMe ? (
+                    <LinearGradient
+                      colors={Gradients.primary.colors}
+                      start={Gradients.primary.start}
+                      end={Gradients.primary.end}
+                      style={[styles.bubble, styles.bubbleMe]}
+                    >
+                      <Text style={[styles.bubbleText, styles.textMe]}>{item.text}</Text>
+                    </LinearGradient>
+                  ) : (
+                    <View style={[styles.bubble, styles.bubbleOther]}>
+                      <Text style={[styles.bubbleText, styles.textOther]}>{item.text}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.timestampRow}>
+                  <Text style={[styles.timestamp, isMe ? styles.timestampMe : styles.timestampOther]}>
+                    {formatTime(item.timestamp)}
+                  </Text>
+                  {isMe && (
+                    <Ionicons 
+                      name={item.read ? "checkmark-done" : "checkmark"} 
+                      size={14} 
+                      color={item.read ? Colors.primary : Colors.textMuted} 
+                      style={styles.readReceipt}
+                    />
+                  )}
                 </View>
               </View>
-            </View>
-          ) : null
-        }
-        contentContainerStyle={styles.messagesList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-      />
+            );
+          }}
+          ListFooterComponent={
+            isTyping ? (
+              <View style={[styles.messageWrapper, styles.wrapperOther, { marginBottom: Spacing.sm }]}>
+                <View style={[styles.messageRow, styles.rowOther]}>
+                  <Image source={{ uri: profile.photos?.[0] }} style={styles.bubbleAvatar} />
+                  <View style={[styles.bubble, styles.bubbleOther, { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm }]}>
+                    <Text style={[styles.bubbleText, styles.textOther, { fontStyle: 'italic', color: Colors.textMuted }]}>Typing...</Text>
+                  </View>
+                </View>
+              </View>
+            ) : null
+          }
+          contentContainerStyle={styles.messagesList}
+          onContentSizeChange={() => {
+            if (!showScrollButton) {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }
+          }}
+        />
+      )}
+
+      {/* Floating Scroll to Bottom Button */}
+      {showScrollButton && (
+        <TouchableOpacity style={styles.scrollBottomBtn} onPress={scrollToBottom}>
+          <Ionicons name="chevron-down" size={24} color={Colors.white} />
+        </TouchableOpacity>
+      )}
 
       {/* Message Input Bar */}
       <View style={[styles.inputBar, { paddingBottom: Platform.OS === 'ios' ? insets.bottom : Spacing.md }]}>
@@ -334,4 +376,10 @@ const styles = StyleSheet.create({
   sendButtonGlow: { shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   sendButton: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   sendButtonDisabled: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.border },
+  
+  skeletonContainer: { flex: 1, padding: Spacing.xl },
+  skeletonBubble: { height: 40, borderRadius: Radius.lg, marginBottom: Spacing.lg, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  skeletonMe: { alignSelf: 'flex-end', borderBottomRightRadius: Radius.xs },
+  skeletonOther: { alignSelf: 'flex-start', borderBottomLeftRadius: Radius.xs },
+  scrollBottomBtn: { position: 'absolute', bottom: 80, right: Spacing.xl, width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', ...Shadow.md, zIndex: 100 },
 });

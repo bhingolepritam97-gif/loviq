@@ -6,14 +6,42 @@ import { Colors, Typography, Spacing, Radius, Shadow } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { auth } from '../../config/firebase';
 import { signOut } from 'firebase/auth';
+import { updateUserProfile } from '../../services/UserService';
 
 export default function SettingsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { profile } = useAuth();
+  const { profile, setProfile, user } = useAuth();
   const [notifications, setNotifications] = useState(true);
   const [showActive, setShowActive] = useState(true);
   const [incognito, setIncognito] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // Privacy and Visibility Switches states
+  const [hideDistance, setHideDistance] = useState(profile?.hideDistance || false);
+  const [paused, setPaused] = useState(profile?.isActive === false);
+
+  const handleToggleHideDistance = async (val) => {
+    setHideDistance(val);
+    if (user && profile) {
+      setProfile({ ...profile, hideDistance: val });
+      await updateUserProfile(user.uid, { hideDistance: val });
+    }
+  };
+
+  const handleTogglePauseAccount = async (val) => {
+    setPaused(val);
+    if (user && profile) {
+      const activeState = !val; // paused = true means isActive = false
+      setProfile({ ...profile, isActive: activeState });
+      await updateUserProfile(user.uid, { isActive: activeState });
+      Alert.alert(
+        activeState ? "Profile Active ⚡" : "Profile Paused 💤",
+        activeState 
+          ? "Your profile is visible again and matches will load." 
+          : "Your profile is now hidden from new matches. You can still chat with existing matches!"
+      );
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -37,7 +65,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleBlockList = () => {
-    Alert.alert("Block List", "Block list settings will be added here.");
+    navigation.navigate('BlockedContacts');
   };
 
   return (
@@ -105,6 +133,30 @@ export default function SettingsScreen({ navigation }) {
           </View>
           <View style={styles.settingItem}>
             <View style={styles.itemLeft}>
+              <Ionicons name="location-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+              <Text style={styles.itemLabel}>Hide My Distance</Text>
+            </View>
+            <Switch
+              value={hideDistance}
+              onValueChange={handleToggleHideDistance}
+              trackColor={{ true: Colors.primary, false: Colors.border }}
+              thumbColor={Colors.white}
+            />
+          </View>
+          <View style={styles.settingItem}>
+            <View style={styles.itemLeft}>
+              <Ionicons name="pause-circle-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+              <Text style={styles.itemLabel}>Pause My Account</Text>
+            </View>
+            <Switch
+              value={paused}
+              onValueChange={handleTogglePauseAccount}
+              trackColor={{ true: Colors.primary, false: Colors.border }}
+              thumbColor={Colors.white}
+            />
+          </View>
+          <View style={styles.settingItem}>
+            <View style={styles.itemLeft}>
               <Ionicons name="glasses-outline" size={20} color={Colors.text} style={styles.itemIcon} />
               <Text style={styles.itemLabel}>Incognito Mode (Premium)</Text>
             </View>
@@ -130,6 +182,31 @@ export default function SettingsScreen({ navigation }) {
             <View style={styles.itemLeft}>
               <Ionicons name="shield-checkmark-outline" size={20} color={Colors.text} style={styles.itemIcon} />
               <Text style={styles.itemLabel}>Blocked Contacts</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        {/* About & Legal */}
+        <Text style={styles.groupTitle}>About</Text>
+        <View style={styles.settingGroup}>
+          <TouchableOpacity 
+            style={styles.settingItem} 
+            onPress={() => Alert.alert('Privacy Policy', 'The Privacy Policy will be hosted on your website and displayed here in a webview.')}
+          >
+            <View style={styles.itemLeft}>
+              <Ionicons name="document-text-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+              <Text style={styles.itemLabel}>Privacy Policy</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.settingItem, { borderBottomWidth: 0 }]} 
+            onPress={() => Alert.alert('Terms of Service', 'The Terms of Service will be hosted on your website and displayed here in a webview.')}
+          >
+            <View style={styles.itemLeft}>
+              <Ionicons name="document-text-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+              <Text style={styles.itemLabel}>Terms of Service</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
           </TouchableOpacity>

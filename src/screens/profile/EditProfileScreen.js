@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../../theme';
 import Input from '../../components/Input';
+import VerifiedBadge from '../../components/VerifiedBadge';
 import { useAuth } from '../../context/AuthContext';
 import { updateUserProfile } from '../../services/UserService';
 import { Alert } from 'react-native';
@@ -113,6 +114,46 @@ export default function EditProfileScreen({ navigation, route }) {
           </View>
         </TouchableOpacity>
 
+        {/* ── Verification banner ──────────────────────────────────────────────
+            Placed directly below photos so it's in the natural flow of editing.
+            Shows either a green "Verified" status chip or an amber CTA.
+        ────────────────────────────────────────────────────────────────────── */}
+        {profile?.isVerified ? (
+          /* ── Already verified: show a green confirmation chip ── */
+          <View style={styles.verifiedBanner}>
+            <Ionicons name="shield-checkmark" size={20} color="#3B82F6" />
+            <View style={styles.verifiedBannerText}>
+              <Text style={styles.verifiedBannerTitle}>You’re verified ✓</Text>
+              <Text style={styles.verifiedBannerSub}>
+                {profile.verifiedAt
+                  ? `Confirmed ${new Date(profile.verifiedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+                  : 'Photo selfie on file'}
+              </Text>
+            </View>
+            <VerifiedBadge isVerified size="sm" showLabel={false} />
+          </View>
+        ) : (
+          /* ── Not verified: show amber CTA banner ── */
+          <TouchableOpacity
+            id="get-verified-cta"
+            style={styles.unverifiedBanner}
+            onPress={() => navigation.navigate('PhotoVerification')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.unverifiedBannerLeft}>
+              <Ionicons name="shield-outline" size={22} color={Colors.warning} />
+              <View style={styles.verifiedBannerText}>
+                <Text style={styles.unverifiedBannerTitle}>Get verified →</Text>
+                <Text style={styles.unverifiedBannerSub}>
+                  Verified profiles get up to 3× more matches
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.warning} />
+          </TouchableOpacity>
+        )}
+        {/* ───────────────────────────────────────────────────────────────────── */}
+
         {/* SECTION: BIO CARD */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
@@ -120,6 +161,9 @@ export default function EditProfileScreen({ navigation, route }) {
               <Text style={styles.sectionEmoji}>📝</Text>
               <Text style={styles.sectionTitle}>BIO</Text>
             </View>
+            <Text style={{ fontSize: 12, color: Colors.textMuted, fontWeight: '700' }}>
+              {bio.length}/500
+            </Text>
           </View>
           <Input
             placeholder="Write something interesting about yourself..."
@@ -127,7 +171,7 @@ export default function EditProfileScreen({ navigation, route }) {
             onChangeText={setBio}
             multiline
             numberOfLines={3}
-            maxLength={250}
+            maxLength={500}
             style={styles.bioInput}
           />
         </View>
@@ -203,13 +247,22 @@ export default function EditProfileScreen({ navigation, route }) {
             </View>
           </View>
           <View style={styles.intentGrid}>
-            {['Long-term', 'Long-term, open to short', 'Short-term, open to long', 'Short-term', 'New friends', 'Still figuring it out'].map((item) => (
+            {[
+              { label: 'Long-term', emoji: '💍' },
+              { label: 'Long-term, open to short', emoji: '🍕' },
+              { label: 'Short-term, open to long', emoji: '⚡' },
+              { label: 'Short-term', emoji: '🔥' },
+              { label: 'New friends', emoji: '🍻' },
+              { label: 'Still figuring it out', emoji: '🤷' }
+            ].map((item) => (
               <TouchableOpacity
-                key={item}
-                style={[styles.intentPill, intent === item && styles.intentPillActive]}
-                onPress={() => setIntent(item)}
+                key={item.label}
+                style={[styles.intentPill, intent === item.label && styles.intentPillActive]}
+                onPress={() => setIntent(item.label)}
               >
-                <Text style={[styles.intentText, intent === item && styles.intentTextActive]}>{item}</Text>
+                <Text style={[styles.intentText, intent === item.label && styles.intentTextActive]}>
+                  {item.emoji} {item.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -259,4 +312,34 @@ const styles = StyleSheet.create({
   intentPillActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '12' },
   intentText: { fontSize: 13, color: Colors.text, fontWeight: '600' },
   intentTextActive: { color: Colors.primary, fontWeight: '700' },
+
+  // ── Verification banners
+  verifiedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(59,130,246,0.08)',
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.25)',
+    padding: Spacing.md,
+    gap: Spacing.md,
+  },
+  verifiedBannerText: { flex: 1 },
+  verifiedBannerTitle: { fontSize: 15, fontWeight: '700', color: '#3B82F6' },
+  verifiedBannerSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+
+  unverifiedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.warningLight,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.warning + '50',
+    padding: Spacing.md,
+    ...Shadow.sm,
+  },
+  unverifiedBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, flex: 1 },
+  unverifiedBannerTitle: { fontSize: 15, fontWeight: '800', color: Colors.warning },
+  unverifiedBannerSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2, lineHeight: 16 },
 });

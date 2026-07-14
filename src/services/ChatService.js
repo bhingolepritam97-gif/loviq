@@ -1,72 +1,73 @@
 import { db, auth } from '../config/firebase';
-import { collection, query, where, orderBy, getDocs, getDoc, doc, addDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, addDoc, updateDoc, onSnapshot, where } from 'firebase/firestore';
+import { apiClient } from '../api/client';
+import { socketService } from '../api/socket';
+
+function mapBackendUserToProfile(u) {
+  if (!u) return null;
+  
+  // Compute age from birthdate
+  let age = 28; // default fallback
+  if (u.birthdate) {
+    const birth = new Date(u.birthdate);
+    age = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+  } else if (u.age) {
+    age = u.age;
+  }
+
+  // Extract photos URLs in correct order
+  let photos = [];
+  if (u.photos && Array.isArray(u.photos)) {
+    photos = [...u.photos]
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map(p => typeof p === 'string' ? p : p.url);
+  }
+
+  return {
+    id: u.id,
+    name: u.name || '',
+    displayName: u.name || '',
+    age,
+    gender: u.gender || '',
+    bio: u.bio || '',
+    interests: u.interests || [],
+    photos,
+    cityName: u.cityName || '',
+  };
+}
+
+function mapBackendMatch(m) {
+  return {
+    id: m.matchId,
+    lastMessage: m.lastMessage || null,
+    lastMessageTime: m.lastMessageTime || m.matchedAt,
+    otherUser: mapBackendUserToProfile(m.user),
+  };
+}
 
 export const fetchMatches = async () => {
-  const currentUid = auth.currentUser?.uid;
-  if (!currentUid) return [];
-  
   try {
-    const matchesRef = collection(db, 'matches');
-    const q = query(matchesRef, where('users', 'array-contains', currentUid));
-    const querySnapshot = await getDocs(q);
-    
-    const matches = [];
-    for (const d of querySnapshot.docs) {
-      const matchData = d.data();
-      const otherUserId = matchData.users.find(uid => uid !== currentUid);
-      
-      // Fetch the other user's profile
-      let otherUser = null;
-      if (otherUserId) {
-        const userSnap = await getDoc(doc(db, 'profiles', otherUserId));
-        if (userSnap.exists()) {
-          otherUser = { id: userSnap.id, ...userSnap.data() };
-        }
-      }
-      
-      matches.push({
-        id: d.id,
-        lastMessage: matchData.lastMessage || null,
-        lastMessageTime: matchData.lastMessageTime || matchData.matchedAt,
-        otherUser: otherUser,
-      });
+    const response = await apiClient('/matches');
+    if (response.success && Array.isArray(response.matches)) {
+      return response.matches.map(mapBackendMatch).filter(m => m.otherUser !== null);
     }
-    
-    // Sort by most recent activity
-    return matches.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+    return [];
   } catch (err) {
-    console.error('Error fetching matches from Firestore:', err);
+    console.warn('Error fetching matches from backend REST API:', err.message);
     return [];
   }
 };
 
 export const fetchMatch = async (matchId) => {
-  const currentUid = auth.currentUser?.uid;
-  if (!matchId || !currentUid) return null;
+  if (!matchId) return null;
   try {
-    const docSnap = await getDoc(doc(db, 'matches', matchId));
-    if (docSnap.exists()) {
-      const matchData = docSnap.data();
-      const otherUserId = matchData.users.find(uid => uid !== currentUid);
-      
-      let otherUser = null;
-      if (otherUserId) {
-        const userSnap = await getDoc(doc(db, 'profiles', otherUserId));
-        if (userSnap.exists()) {
-          otherUser = { id: userSnap.id, ...userSnap.data() };
-        }
-      }
-      
-      return {
-        id: docSnap.id,
-        lastMessage: matchData.lastMessage || null,
-        lastMessageTime: matchData.lastMessageTime || matchData.matchedAt,
-        otherUser: otherUser,
-      };
+    const response = await apiClient(`/matches/${matchId}`);
+    if (response.success && response.match) {
+      return mapBackendMatch(response.match);
     }
     return null;
   } catch (err) {
-    console.error('Error fetching single match from Firestore:', err);
+    console.warn('Error fetching single match from backend REST API:', err.message);
     return null;
   }
 };
@@ -74,133 +75,85 @@ export const fetchMatch = async (matchId) => {
 export const fetchMatchMessages = async (matchId) => {
   if (!matchId) return [];
   try {
-    const messagesRef = collection(db, 'matches', matchId, 'messages');
-    const q = query(messagesRef, orderBy('createdAt', 'asc'));
-    const querySnapshot = await getDocs(q);
-    
-    const messages = [];
-    querySnapshot.forEach((d) => {
-      messages.push({
-        id: d.id,
-        senderId: d.data().senderId,
-        text: d.data().content,
-        timestamp: d.data().createdAt,
-        read: d.data().read
-      });
-    });
-    return messages;
+    const response = await apiClient(`/matches/${matchId}/messages`);
+    if (response.success && Array.isArray(response.messages)) {
+      return response.messages.map((m) => ({
+        id: m.id.toString(),
+        senderId: m.senderId,
+        text: m.content,
+        timestamp: m.createdAt,
+        read: true,
+      }));
+    }
+    return [];
   } catch (err) {
-    console.error('Error fetching messages from Firestore:', err);
+    console.warn('Error fetching messages from Postgres REST API:', err.message);
     return [];
   }
 };
 
 export const sendMessage = async (matchId, senderId, text) => {
   if (!matchId || !senderId || !text.trim()) return null;
-
   try {
-    const messagesRef = collection(db, 'matches', matchId, 'messages');
-    const timestamp = new Date().toISOString();
-    
-    const docRef = await addDoc(messagesRef, {
-      senderId,
-      content: text.trim(),
-      createdAt: timestamp,
-      read: false
+    const response = await apiClient(`/matches/${matchId}/messages`, {
+      method: 'POST',
+      body: { content: text.trim() }
     });
-    
-    // Update the parent match document with last message
-    await updateDoc(doc(db, 'matches', matchId), {
-      lastMessage: text.trim(),
-      lastMessageTime: timestamp
-    });
-    
-    return {
-      id: docRef.id,
-      senderId,
-      text: text.trim(),
-      timestamp,
-      read: false
-    };
+    if (response.success && response.message) {
+      const m = response.message;
+      return {
+        id: m.id.toString(),
+        senderId: m.senderId,
+        text: m.content,
+        timestamp: m.createdAt,
+        read: false
+      };
+    }
+    return null;
   } catch (err) {
-    console.error('Error sending message via Firestore:', err);
+    console.error('Error sending message via Postgres REST API:', err);
     return null;
   }
 };
 
-
-
 export const subscribeToMessages = (matchId, callback) => {
   if (!matchId) return () => {};
-  
-  const messagesRef = collection(db, 'matches', matchId, 'messages');
-  const q = query(messagesRef, orderBy('createdAt', 'asc'));
-  
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const messages = [];
-    snapshot.forEach((d) => {
-      messages.push({
-        id: d.id,
-        senderId: d.data().senderId,
-        text: d.data().content,
-        timestamp: d.data().createdAt,
-        read: d.data().read
-      });
-    });
-    callback(messages);
-  });
-  
-  return unsubscribe;
+  const socket = socketService.getSocket();
+  if (socket) {
+    socket.emit("join_match", matchId);
+    
+    const handleNewMessage = async () => {
+      const updated = await fetchMatchMessages(matchId);
+      callback(updated);
+    };
+    socket.on("new_message", handleNewMessage);
+    return () => {
+      socket.off("new_message", handleNewMessage);
+    };
+  }
+  return () => {};
 };
 
 export const subscribeToMatches = (callback) => {
   const currentUid = auth.currentUser?.uid;
   if (!currentUid) return () => {};
 
-  const matchesRef = collection(db, 'matches');
-  const q = query(matchesRef, where('users', 'array-contains', currentUid));
-
-  const unsubscribe = onSnapshot(q, async (snapshot) => {
-    const matches = [];
-    for (const d of snapshot.docs) {
-      const matchData = d.data();
-      const otherUserId = matchData.users.find(uid => uid !== currentUid);
-      
-      let otherUser = null;
-      if (otherUserId) {
-        const userSnap = await getDoc(doc(db, 'profiles', otherUserId));
-        if (userSnap.exists()) {
-          otherUser = { id: userSnap.id, ...userSnap.data() };
-        }
-      }
-      
-      matches.push({
-        id: d.id,
-        lastMessage: matchData.lastMessage || null,
-        lastMessageTime: matchData.lastMessageTime || matchData.matchedAt,
-        read: matchData.lastMessage ? false : true, // Simplification: in real app, track read status per user
-        typing: matchData.typing || {},
-        otherUser: otherUser,
-      });
-    }
-    
-    // Sort by most recent activity
-    matches.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
-    callback(matches);
+  let active = true;
+  fetchMatches().then(res => {
+    if (active) callback(res);
   });
 
-  return unsubscribe;
+  // Since HTTP is not socket based in MVP, fetch once on focus
+  return () => {
+    active = false;
+  };
 };
 
 export const updateTypingStatus = async (matchId, userId, isTyping) => {
   if (!matchId || !userId) return;
-  try {
-    const matchRef = doc(db, 'matches', matchId);
-    await updateDoc(matchRef, {
-      [`typing.${userId}`]: isTyping
-    });
-  } catch (err) {
-    console.error('Error updating typing status:', err);
+  const socket = socketService.getSocket();
+  if (socket) {
+    socket.emit("typing", { matchId, isTyping });
   }
 };
 
@@ -211,7 +164,6 @@ export const markMessagesAsRead = async (matchId, userId) => {
     const q = query(messagesRef, where('senderId', '!=', userId), where('read', '==', false));
     const querySnapshot = await getDocs(q);
     
-    // In a real app with many messages, you'd want to use a batched write here
     const updatePromises = [];
     querySnapshot.forEach((d) => {
       updatePromises.push(updateDoc(d.ref, { read: true }));

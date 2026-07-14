@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +18,7 @@ export default function OTPScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSent, setResendSent] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
 
   const { confirmationResult, phone, isMock, email, isLogin = false, isEmailLink = false } = route.params || {};
 
@@ -38,6 +39,14 @@ export default function OTPScreen({ route, navigation }) {
   };
 
   useEffect(() => {
+    let interval;
+    if (resendTimer > 0) {
+      interval = setInterval(() => setResendTimer(t => t - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  useEffect(() => {
     if (isComplete && !loading) {
       handleVerify();
     }
@@ -49,7 +58,7 @@ export default function OTPScreen({ route, navigation }) {
 
     if (isMock) {
       if (enteredCode === '123456') {
-        navigation.navigate('Password', { phone, email, isMock, isLogin });
+        navigation.navigate('BasicInfo', { phone, email, isMock, isLogin });
       } else {
         setError('Incorrect code. Try 123456 for this demo.');
         setCode(Array(CODE_LENGTH).fill(''));
@@ -72,6 +81,26 @@ export default function OTPScreen({ route, navigation }) {
       }
     } else {
       setError('Session expired. Please request a new code.');
+    }
+  };
+
+  const handlePhoneResend = async () => {
+    if (resendTimer > 0) return;
+    setResendLoading(true);
+    try {
+      if (isMock) {
+        setResendSent(true);
+        setResendTimer(60);
+        Alert.alert('Mock OTP Sent', 'A mock code was sent. Use code: 123456');
+      } else {
+        setResendSent(true);
+        setResendTimer(60);
+        Alert.alert('OTP Resent', 'A new verification code has been requested.');
+      }
+    } catch (e) {
+      setError('Failed to resend code: ' + e.message);
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -244,10 +273,20 @@ export default function OTPScreen({ route, navigation }) {
           </View>
         )}
 
-        <TouchableOpacity style={styles.resendRow}>
-          <Text style={styles.resendText}>Didn't get it? </Text>
-          <Text style={styles.resendLink}>Resend Code</Text>
-        </TouchableOpacity>
+        {resendSent && resendTimer > 0 ? (
+          <View style={styles.resendRow}>
+            <Text style={styles.resendText}>Resend code in {resendTimer}s</Text>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.resendRow} onPress={handlePhoneResend} disabled={resendLoading}>
+            <Text style={styles.resendText}>Didn't get it? </Text>
+            {resendLoading ? (
+              <ActivityIndicator size="small" color="#E91E8C" style={{ marginLeft: 4 }} />
+            ) : (
+              <Text style={styles.resendLink}>Resend Code</Text>
+            )}
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       {/* Pill Actions */}

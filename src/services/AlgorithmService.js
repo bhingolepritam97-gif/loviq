@@ -1,12 +1,21 @@
 /**
  * AlgorithmService.js
- * 
- * Core mathematical engine for calculating ELO scores, ranking stacks, 
+ *
+ * Core mathematical engine for calculating ELO scores, ranking stacks,
  * and analyzing swipe behavior for spam detection.
+ *
+ * Verification policy (see applyRankingModifiers):
+ *   Verified profiles:   +10% score boost  (existing, unchanged)
+ *   Unverified profiles: -20% score penalty (new)
+ *   New accounts < NEW_USER_GRACE_DAYS old: exempt from the unverified penalty
+ *   so they aren't invisible before they've had a chance to complete verification.
  */
 
 const DEFAULT_ELO = 1500;
 const ELO_K_FACTOR = 32;
+
+// How many days after signup a new user is exempt from the unverified penalty.
+const NEW_USER_GRACE_DAYS = 3;
 
 /**
  * Calculates the new ELO score for a user after being swiped on.
@@ -61,35 +70,52 @@ export const analyzeSwipeBehavior = (swipeStats) => {
 export const applyRankingModifiers = (currentUser, candidate, baseScore) => {
   let adjustedScore = baseScore;
 
-  // New User Boost (Account < 48h old)
-  // Assuming createdAt is a timestamp
   const now = Date.now();
-  const candidateAgeMs = candidate.createdAt ? (now - candidate.createdAt.toMillis?.() || candidate.createdAt) : now;
-  if (candidateAgeMs < 48 * 60 * 60 * 1000) {
-    adjustedScore *= 1.50; // +50% score
+
+  // ── Resolve createdAt to ms regardless of whether it's a Firestore
+  //    Timestamp object, an ISO string, or a raw ms number.
+  const resolveMs = (val) => {
+    if (!val) return now;
+    if (typeof val === 'object' && typeof val.toMillis === 'function') return val.toMillis();
+    if (typeof val === 'string') return new Date(val).getTime();
+    return Number(val);
+  };
+
+  const createdAtMs  = resolveMs(candidate.createdAt);
+  const lastActiveMs = resolveMs(candidate.lastActive);
+  const accountAgeMs = now - createdAtMs;
+  const isNewAccount = accountAgeMs < NEW_USER_GRACE_DAYS * 24 * 60 * 60 * 1000;
+
+  // New User Boost (account < 48 h old)
+  if (accountAgeMs < 48 * 60 * 60 * 1000) {
+    adjustedScore *= 1.50; // +50%
   }
 
-  // Recency Boost (Active within 24 hours)
-  const lastActiveMs = candidate.lastActive ? (now - candidate.lastActive.toMillis?.() || candidate.lastActive) : now;
-  if (lastActiveMs < 24 * 60 * 60 * 1000) {
-    adjustedScore *= 1.20; // +20% score
+  // Recency Boost (active within 24 h)
+  if (now - lastActiveMs < 24 * 60 * 60 * 1000) {
+    adjustedScore *= 1.20; // +20%
   }
 
-  // Verification Boost
+  // ── Verification modifier ─────────────────────────────────────────────
   if (candidate.isVerified) {
-    adjustedScore *= 1.10; // +10% score
+    adjustedScore *= 1.10; // +10% — verified profiles float toward the top
+  } else if (!isNewAccount) {
+    // Unverified penalty — skip for brand-new accounts so they aren't
+    // invisible before they've had a chance to complete verification.
+    adjustedScore *= 0.80; // -20% — unverified profiles naturally sink
   }
+  // ─────────────────────────────────────────────────────────────────────
 
   // Premium Boost
   if (candidate.isPremium) {
-    adjustedScore *= 1.15; // +15% score
+    adjustedScore *= 1.15; // +15%
   }
 
   // ELO Mismatch Penalty
-  const userElo = currentUser.eloScore || DEFAULT_ELO;
-  const candidateElo = candidate.eloScore || DEFAULT_ELO;
+  const userElo      = currentUser.eloScore || DEFAULT_ELO;
+  const candidateElo = candidate.eloScore   || DEFAULT_ELO;
   if (Math.abs(userElo - candidateElo) > 400) {
-    adjustedScore *= 0.75; // -25% score
+    adjustedScore *= 0.75; // -25%
   }
 
   return adjustedScore;
