@@ -14,7 +14,7 @@ const app = express();
 
 app.set('trust proxy', 1);
 app.use(helmet());
-app.use(cors({ origin: ['vela://', 'https://vela-api.onrender.com'] }));
+app.use(cors({ origin: ['vela://', 'https://loviq-api.onrender.com'] }));
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
@@ -35,7 +35,7 @@ const { User, Match, Message } = require("./models");
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: ['vela://', 'https://vela-api.onrender.com'] }
+  cors: { origin: ['vela://', 'https://loviq-api.onrender.com'] }
 });
 
 // Basic socket auth middleware matching our REST auth
