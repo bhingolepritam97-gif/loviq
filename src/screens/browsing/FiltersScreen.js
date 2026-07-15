@@ -10,7 +10,7 @@
  * immediately when the user navigates back.
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -39,6 +39,14 @@ const GENDERS = [
 // ─── Pure-JS Single Slider ─────────────────────────────────────────────────────
 const SingleSlider = ({ min, max, value, onChange, formatLabel }) => {
   const [width, setWidth] = useState(0);
+  const [localVal, setLocalVal] = useState(value);
+  const localValRef = useRef(value);
+
+  useEffect(() => {
+    setLocalVal(value);
+    localValRef.current = value;
+  }, [value]);
+
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -46,17 +54,24 @@ const SingleSlider = ({ min, max, value, onChange, formatLabel }) => {
       onPanResponderGrant: (evt) => {
         if (!width) return;
         const pct = Math.max(0, Math.min(1, evt.nativeEvent.locationX / width));
-        onChange(Math.round(min + pct * (max - min)));
+        const val = Math.round(min + pct * (max - min));
+        setLocalVal(val);
+        localValRef.current = val;
       },
       onPanResponderMove: (evt) => {
         if (!width) return;
         const pct = Math.max(0, Math.min(1, evt.nativeEvent.locationX / width));
-        onChange(Math.round(min + pct * (max - min)));
+        const val = Math.round(min + pct * (max - min));
+        setLocalVal(val);
+        localValRef.current = val;
+      },
+      onPanResponderRelease: () => {
+        onChange(localValRef.current);
       },
     })
   ).current;
 
-  const pct = (value - min) / (max - min);
+  const pct = (localVal - min) / (max - min);
 
   return (
     <View style={styles.sliderOuter}>
@@ -78,7 +93,7 @@ const SingleSlider = ({ min, max, value, onChange, formatLabel }) => {
       </View>
       {formatLabel && (
         <View style={[styles.thumbLabel, { left: `${pct * 100}%`, transform: [{ translateX: -28 }] }]}>
-          <Text style={styles.thumbLabelText}>{formatLabel(value)}</Text>
+          <Text style={styles.thumbLabelText}>{formatLabel(localVal)}</Text>
         </View>
       )}
     </View>
@@ -88,7 +103,14 @@ const SingleSlider = ({ min, max, value, onChange, formatLabel }) => {
 // ─── Pure-JS Double Slider ─────────────────────────────────────────────────────
 const DoubleSlider = ({ min, max, values, onChange }) => {
   const [width, setWidth] = useState(0);
+  const [localVals, setLocalVals] = useState(values);
+  const localValsRef = useRef(values);
   const active = useRef(null);
+
+  useEffect(() => {
+    setLocalVals(values);
+    localValsRef.current = values;
+  }, [values]);
 
   const pan = useRef(
     PanResponder.create({
@@ -99,24 +121,31 @@ const DoubleSlider = ({ min, max, values, onChange }) => {
         const pct = evt.nativeEvent.locationX / width;
         const clickVal = min + pct * (max - min);
         active.current =
-          Math.abs(clickVal - values[0]) < Math.abs(clickVal - values[1]) ? 'min' : 'max';
+          Math.abs(clickVal - localValsRef.current[0]) < Math.abs(clickVal - localValsRef.current[1]) ? 'min' : 'max';
       },
       onPanResponderMove: (evt) => {
         if (!width || !active.current) return;
         const pct = Math.max(0, Math.min(1, evt.nativeEvent.locationX / width));
         const val = Math.round(min + pct * (max - min));
+        const currentVals = localValsRef.current;
+        let newVals;
         if (active.current === 'min') {
-          onChange([Math.max(min, Math.min(val, values[1] - 1)), values[1]]);
+          newVals = [Math.max(min, Math.min(val, currentVals[1] - 1)), currentVals[1]];
         } else {
-          onChange([values[0], Math.min(max, Math.max(val, values[0] + 1))]);
+          newVals = [currentVals[0], Math.min(max, Math.max(val, currentVals[0] + 1))];
         }
+        setLocalVals(newVals);
+        localValsRef.current = newVals;
       },
-      onPanResponderRelease: () => { active.current = null; },
+      onPanResponderRelease: () => {
+        active.current = null;
+        onChange(localValsRef.current);
+      },
     })
   ).current;
 
-  const pMin = (values[0] - min) / (max - min);
-  const pMax = (values[1] - min) / (max - min);
+  const pMin = (localVals[0] - min) / (max - min);
+  const pMax = (localVals[1] - min) / (max - min);
 
   return (
     <View style={styles.sliderOuter}>
@@ -144,10 +173,10 @@ const DoubleSlider = ({ min, max, values, onChange }) => {
       {/* Thumb labels below */}
       <View style={styles.doubleThumbLabels}>
         <View style={[styles.thumbLabel, { left: `${pMin * 100}%`, transform: [{ translateX: -18 }] }]}>
-          <Text style={styles.thumbLabelText}>{values[0]}</Text>
+          <Text style={styles.thumbLabelText}>{localVals[0]}</Text>
         </View>
         <View style={[styles.thumbLabel, { left: `${pMax * 100}%`, transform: [{ translateX: -18 }] }]}>
-          <Text style={styles.thumbLabelText}>{values[1]}</Text>
+          <Text style={styles.thumbLabelText}>{localVals[1]}</Text>
         </View>
       </View>
     </View>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { swapPhotos } from '../utils/photoHelpers';
 import { validatePhoto } from '../services/ValidationService';
 
@@ -7,6 +7,15 @@ export default function usePhotoUpload(initialPhotos = [], maxPhotos = 6) {
   const [activeSlot, setActiveSlot] = useState(null);
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [selectedSwapIndex, setSelectedSwapIndex] = useState(null);
+  
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const startUpload = useCallback((uri, activeIndex) => {
     const photoId = `photo-${Date.now()}`;
@@ -52,13 +61,15 @@ export default function usePhotoUpload(initialPhotos = [], maxPhotos = 6) {
 
         const aiResults = await validatePhoto(compressedUri, photos.filter(p => p.id !== photoId));
 
-        setPhotos(prev => prev.map(p => p.id === photoId ? {
-          ...p,
-          uri: uploadUrl,
-          uploading: false,
-          progress: 1.0,
-          aiResults,
-        } : p));
+        if (isMounted.current) {
+          setPhotos(prev => prev.map(p => p.id === photoId ? {
+            ...p,
+            uri: uploadUrl,
+            uploading: false,
+            progress: 1.0,
+            aiResults,
+          } : p));
+        }
       } catch (err) {
         console.warn("Firebase upload failed, falling back to local image URI:", err.message);
         
@@ -72,14 +83,16 @@ export default function usePhotoUpload(initialPhotos = [], maxPhotos = 6) {
           warnings: []
         };
 
-        setPhotos(prev => prev.map(p => p.id === photoId ? {
-          ...p,
-          uri: uri, // Use original local image URI
-          uploading: false,
-          progress: 1.0,
-          aiResults: fallbackAiResults,
-          error: false, // Ensure error status is cleared
-        } : p));
+        if (isMounted.current) {
+          setPhotos(prev => prev.map(p => p.id === photoId ? {
+            ...p,
+            uri: uri, // Use original local image URI
+            uploading: false,
+            progress: 1.0,
+            aiResults: fallbackAiResults,
+            error: false, // Ensure error status is cleared
+          } : p));
+        }
       }
     };
 

@@ -216,27 +216,47 @@ async function blockUser(req, res) {
   if (!blockedId) return res.status(400).json({ success: false, error: "blockedId is required" });
 
   const { Block, Match, Swipe } = require("../models");
+  const { Op } = require("sequelize");
   
   try {
+    // If blockedId is not a UUID, try to look it up as a phone or name!
+    const isUuid = /^[0-9a-f-]{36}$/i.test(blockedId);
+    let targetUserId = blockedId;
+
+    if (!isUuid) {
+      const targetUser = await User.findOne({
+        where: {
+          [Op.or]: [
+            { phone: blockedId },
+            { name: blockedId }
+          ]
+        }
+      });
+      if (!targetUser) {
+        return res.status(404).json({ success: false, error: "User not found with matching phone or name" });
+      }
+      targetUserId = targetUser.id;
+    }
+
     await Block.findOrCreate({
-      where: { blockerId: req.dbUser.id, blockedId },
+      where: { blockerId: req.dbUser.id, blockedId: targetUserId },
     });
 
     // Clean up any existing matches or swipes
     await Match.destroy({
       where: {
-        [sequelize.Op.or]: [
-          { userAId: req.dbUser.id, userBId: blockedId },
-          { userAId: blockedId, userBId: req.dbUser.id },
+        [Op.or]: [
+          { userAId: req.dbUser.id, userBId: targetUserId },
+          { userAId: targetUserId, userBId: req.dbUser.id },
         ]
       }
     });
 
     await Swipe.destroy({
       where: {
-        [sequelize.Op.or]: [
-          { swiperId: req.dbUser.id, swipedId: blockedId },
-          { swiperId: blockedId, swipedId: req.dbUser.id },
+        [Op.or]: [
+          { swiperId: req.dbUser.id, swipedId: targetUserId },
+          { swiperId: targetUserId, swipedId: req.dbUser.id },
         ]
       }
     });

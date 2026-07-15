@@ -150,6 +150,10 @@ export default function ActiveCallScreen({ route, navigation }) {
         socket.on("call_ended", () => {
           navigation.goBack();
         });
+        socket.on("disconnect", () => {
+          console.warn("[WebRTC] Socket disconnected, ending call.");
+          navigation.goBack();
+        });
       }
     };
 
@@ -163,6 +167,7 @@ export default function ActiveCallScreen({ route, navigation }) {
         socket.off("webrtc_ice");
         socket.off("call_accepted");
         socket.off("call_ended");
+        socket.off("disconnect");
       }
 
       // Stop local tracks

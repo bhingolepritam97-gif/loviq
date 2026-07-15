@@ -39,6 +39,8 @@ export default function MatchScreen({ route, navigation }) {
   const hearts = heartsRef.current;
 
   useEffect(() => {
+    let active = true;
+
     // Initial entrance animations
     Animated.sequence([
       Animated.parallel([
@@ -52,37 +54,42 @@ export default function MatchScreen({ route, navigation }) {
     ]).start();
 
     // Loop infinite float left avatar
-    Animated.loop(
+    const animLeft = Animated.loop(
       Animated.sequence([
         Animated.timing(floatLeft, { toValue: -6, duration: 2500, useNativeDriver: true }),
         Animated.timing(floatLeft, { toValue: 0, duration: 2500, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    animLeft.start();
 
     // Loop infinite float right avatar
-    Animated.loop(
+    const animRight = Animated.loop(
       Animated.sequence([
         Animated.timing(floatRight, { toValue: 6, duration: 2300, useNativeDriver: true }),
         Animated.timing(floatRight, { toValue: 0, duration: 2300, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    animRight.start();
 
     // Loop heart pulse
-    Animated.loop(
+    const animPulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1.15, duration: 900, useNativeDriver: true }),
         Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    animPulse.start();
 
     // Start drifting hearts particles
+    const particleAnimations = [];
     hearts.forEach((heart) => {
       const animateHeart = () => {
+        if (!active) return;
         heart.y.setValue(0);
         heart.opacity.setValue(0);
         heart.xOffset.setValue(0);
         
-        Animated.sequence([
+        const seq = Animated.sequence([
           Animated.delay(heart.delay),
           Animated.parallel([
             Animated.timing(heart.opacity, { toValue: 0.85, duration: 400, useNativeDriver: true }),
@@ -93,12 +100,23 @@ export default function MatchScreen({ route, navigation }) {
             ]),
           ]),
           Animated.timing(heart.opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
-        ]).start(() => {
-          animateHeart();
+        ]);
+        
+        particleAnimations.push(seq);
+        seq.start(() => {
+          if (active) animateHeart();
         });
       };
       animateHeart();
     });
+
+    return () => {
+      active = false;
+      animLeft.stop();
+      animRight.stop();
+      animPulse.stop();
+      particleAnimations.forEach(a => a.stop());
+    };
   }, []);
 
   if (!profile) return null;
@@ -206,11 +224,11 @@ export default function MatchScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgba(18, 10, 10, 0.93)' },
+  container: { flex: 1, backgroundColor: 'rgba(18, 32, 46, 0.95)' },
   content: { flex: 1, justifyContent: 'space-evenly', alignItems: 'center', paddingHorizontal: Spacing['2xl'] },
   glowRadial: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(233, 30, 140, 0.08)',
+    backgroundColor: 'rgba(198, 96, 46, 0.15)',
     borderRadius: width,
     transform: [{ scale: 1.5 }],
   },

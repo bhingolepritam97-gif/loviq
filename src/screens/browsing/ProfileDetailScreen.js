@@ -36,6 +36,11 @@ const DEFAULT_BASICS = [
 export default function ProfileDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { profile } = route.params || {};
+
+  if (profile && !profile.id) {
+    profile.id = profile.uid || profile.firebaseUid;
+  }
+
   const { user: me, profile: myProfile } = useAuth();
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   
@@ -60,7 +65,25 @@ export default function ProfileDetailScreen({ route, navigation }) {
 
   const prompts = profile.prompts || DEFAULT_PROMPTS;
   const instagram = profile.instagramPhotos || DEFAULT_INSTAGRAM;
-  const basics = profile.basics || DEFAULT_BASICS;
+  
+  // Dynamically build basics list including actual height
+  const basics = [];
+  if (profile.height) {
+    basics.push({ icon: '📏', label: `${profile.height} cm` });
+  }
+  if (profile.exercise) {
+    basics.push({ icon: '🏋️', label: profile.exercise });
+  }
+  if (profile.drinking) {
+    basics.push({ icon: '🍷', label: profile.drinking });
+  }
+  if (profile.pets) {
+    basics.push({ icon: '🐶', label: profile.pets });
+  }
+  if (profile.starSign) {
+    basics.push({ icon: '♈', label: profile.starSign });
+  }
+  
   const sharedInterests = myProfile?.interests?.filter(i => profile.interests?.includes(i)) || [];
 
   const handleNextPhoto = () => {
@@ -168,7 +191,8 @@ export default function ProfileDetailScreen({ route, navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <>
+      <View style={styles.container}>
       <ScrollView 
         contentContainerStyle={styles.scroll} 
         showsVerticalScrollIndicator={false}
@@ -279,20 +303,23 @@ export default function ProfileDetailScreen({ route, navigation }) {
           </View>
           {/* ─────────────────────────────────────────────────────────────────────── */}
 
-          <View style={styles.divider} />
-
           {/* Basics Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Basics</Text>
-            <View style={styles.basicsGrid}>
-              {basics.map((item, idx) => (
-                <View key={idx} style={styles.basicPill}>
-                  <Text style={styles.basicEmoji}>{item.icon}</Text>
-                  <Text style={styles.basicLabel}>{item.label}</Text>
+          {basics.length > 0 && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Basics</Text>
+                <View style={styles.basicsGrid}>
+                  {basics.map((item, idx) => (
+                    <View key={idx} style={styles.basicPill}>
+                      <Text style={styles.basicEmoji}>{item.icon}</Text>
+                      <Text style={styles.basicLabel}>{item.label}</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-          </View>
+              </View>
+            </>
+          )}
 
           {/* Prompts Section */}
           {prompts.length > 0 && (
@@ -315,8 +342,6 @@ export default function ProfileDetailScreen({ route, navigation }) {
             </View>
           )}
 
-          <View style={styles.divider} />
-
           {/* Shared Interests */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Interests</Text>
@@ -334,41 +359,9 @@ export default function ProfileDetailScreen({ route, navigation }) {
               })}
             </View>
           </View>
-
-          <View style={styles.divider} />
-
-          {/* Spotify Anthem Placeholder */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>My Anthem</Text>
-            <View style={styles.spotifyCard}>
-              <View style={styles.spotifyArt} />
-              <View style={styles.spotifyInfo}>
-                <Text style={styles.songTitle}>Blinding Lights</Text>
-                <Text style={styles.artistName}>The Weeknd</Text>
-              </View>
-              <Ionicons name="logo-spotify" size={32} color="#1DB954" style={styles.spotifyIcon} />
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Instagram Grid Placeholder */}
-          <View style={styles.section}>
-            <View style={styles.instaHeader}>
-              <Text style={styles.sectionTitle}>Recent Photos</Text>
-              <Ionicons name="logo-instagram" size={24} color={Colors.textMuted} />
-            </View>
-            <View style={styles.instaGrid}>
-              {instagram.map((uri, idx) => (
-                <Image key={idx} source={{ uri }} style={styles.instaPhoto} />
-              ))}
-            </View>
-          </View>
-          
-          {/* Report Footer removed */}
-
         </View>
       </ScrollView>
+    </View>
 
       {/* Bottom Swipe Controls removed */}
 
@@ -421,8 +414,7 @@ export default function ProfileDetailScreen({ route, navigation }) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-    </View>
+    </>
   );
 }
 

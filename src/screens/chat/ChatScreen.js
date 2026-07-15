@@ -111,6 +111,8 @@ export default function ChatScreen({ route, navigation }) {
       await sendMessage(matchId, user.uid, messageText);
     } catch (error) {
       console.error('Failed to send message:', error);
+      setText(messageText);
+      Alert.alert('Send Failed ⚠️', 'Unable to send message. Please check your internet connection and try again.');
     }
   };
 
@@ -343,7 +345,7 @@ export default function ChatScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, height: 60, backgroundColor: Colors.surface, zIndex: 10, ...Shadow.sm },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, height: 60, backgroundColor: Colors.background, borderBottomWidth: 1, borderColor: Colors.border, zIndex: 10 },
   backBtn: { padding: Spacing.xs },
   profileMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, flex: 1, marginLeft: Spacing.md },
   headerName: { fontSize: 16, fontWeight: '700', color: Colors.text },
@@ -368,10 +370,10 @@ const styles = StyleSheet.create({
   timestampMe: { alignSelf: 'flex-end' },
   timestampOther: { alignSelf: 'flex-start', marginLeft: 36 },
   readReceipt: { marginLeft: 4 },
-  inputBar: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, backgroundColor: Colors.surface, borderTopWidth: 1, borderColor: Colors.border },
+  inputBar: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, backgroundColor: Colors.background, borderTopWidth: 1, borderColor: Colors.border },
   inputContainer: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingBottom: Spacing.sm },
   attachBtn: { padding: Spacing.xs },
-  textInputWrapper: { flex: 1, backgroundColor: Colors.background, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', minHeight: 40, maxHeight: 100 },
+  textInputWrapper: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius['2xl'], paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', minHeight: 40, maxHeight: 100 },
   textInputStyle: { fontSize: 15, color: Colors.text, padding: 0, margin: 0 },
   sendButtonGlow: { shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   sendButton: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },

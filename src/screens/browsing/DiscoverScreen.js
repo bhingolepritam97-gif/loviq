@@ -71,14 +71,15 @@ export default function DiscoverScreen({ navigation, route }) {
     }
 
     if (user && profile) {
+      // Trigger location capture if the profile is missing coordinates and do not query yet.
+      if (!profile.location?.latitude) {
+        setLoading(true);
+        captureLocation();
+        return () => {};
+      }
+
       setLoading(true);
       setError(null);
-
-      // Trigger location capture if the profile is missing coordinates.
-      // captureLocation is idempotent — it's a no-op if location is already set.
-      if (!profile.location?.latitude) {
-        captureLocation();
-      }
 
       const unsubscribe = subscribeToPotentialMatches(user.uid, profile, (potential) => {
         setProfiles(potential);

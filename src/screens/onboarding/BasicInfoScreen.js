@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import ProgressBar from '../../components/ProgressBar';
 import { trackOnboardingStep, trackOnboardingStepCompleted } from '../../utils/onboardingAnalytics';
+import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const GENDERS = ['Woman', 'Man', 'Non-binary'];
 
@@ -41,14 +43,16 @@ export default function BasicInfoScreen({ navigation, route }) {
       <TextInput
         style={styles.input}
         placeholder="First name"
+        placeholderTextColor={Colors.textMuted}
         value={name}
         onChangeText={setName}
         autoFocus
+        selectionColor={Colors.primary}
       />
 
       <TouchableOpacity
         style={styles.input}
-        onPress={() => setShowDatePicker(true)}
+        onPress={() => setShowDatePicker(prev => !prev)}
       >
         <Text style={birthday ? styles.inputText : styles.placeholderText}>
           {birthday
@@ -61,9 +65,15 @@ export default function BasicInfoScreen({ navigation, route }) {
           value={birthday || new Date(2000, 0, 1)}
           mode="date"
           maximumDate={new Date()}
-          onChange={(_, selectedDate) => {
-            setShowDatePicker(false);
-            if (selectedDate) setBirthday(selectedDate);
+          onChange={(event, selectedDate) => {
+            if (Platform.OS === 'android') {
+              setShowDatePicker(false);
+              if (event.type === 'set' && selectedDate) {
+                setBirthday(selectedDate);
+              }
+            } else {
+              if (selectedDate) setBirthday(selectedDate);
+            }
           }}
         />
       )}
@@ -90,36 +100,45 @@ export default function BasicInfoScreen({ navigation, route }) {
         style={[styles.continueButton, !isValid && styles.continueButtonDisabled]}
         disabled={!isValid || (age !== null && age < 18)}
         onPress={handleContinue}
+        activeOpacity={isValid ? 0.85 : 1}
       >
-        <Text style={styles.continueButtonText}>Continue</Text>
+        <LinearGradient
+          colors={isValid ? Gradients.primary.colors : [Colors.border, Colors.border]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.continueGradient}
+        >
+          <Text style={styles.continueButtonText}>Continue</Text>
+        </LinearGradient>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, paddingTop: 60, backgroundColor: '#fff' },
-  title: { fontSize: 28, fontWeight: '700', marginBottom: 24, marginTop: 16 },
+  container: { flex: 1, padding: Spacing.xl, paddingTop: 60, backgroundColor: Colors.background },
+  title: { fontSize: 28, fontWeight: '800', color: Colors.text, marginBottom: 24, marginTop: 16 },
   input: {
-    borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 12,
+    borderWidth: 1, borderColor: Colors.border, borderRadius: Radius['2xl'],
     padding: 16, fontSize: 16, marginBottom: 16, justifyContent: 'center',
+    backgroundColor: Colors.surface,
   },
-  inputText: { fontSize: 16, color: '#000' },
-  placeholderText: { fontSize: 16, color: '#999' },
-  errorText: { color: '#e74c3c', marginBottom: 12, fontSize: 13 },
-  label: { fontSize: 14, color: '#666', marginBottom: 8, marginTop: 8 },
+  inputText: { fontSize: 16, color: Colors.text },
+  placeholderText: { fontSize: 16, color: Colors.textMuted },
+  errorText: { color: Colors.error, marginBottom: 12, fontSize: 13, fontWeight: '600' },
+  label: { fontSize: 14, color: Colors.textMuted, marginBottom: 8, marginTop: 8, fontWeight: '600' },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 32 },
   pill: {
-    paddingVertical: 10, paddingHorizontal: 18, borderRadius: 24,
-    borderWidth: 1, borderColor: '#e0e0e0',
+    paddingVertical: 10, paddingHorizontal: 18, borderRadius: Radius.full,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface,
   },
-  pillSelected: { backgroundColor: '#FF4667', borderColor: '#FF4667' },
-  pillText: { color: '#333', fontSize: 14 },
-  pillTextSelected: { color: '#fff', fontWeight: '600' },
+  pillSelected: { backgroundColor: Colors.primary + '15', borderColor: Colors.primary },
+  pillText: { color: Colors.text, fontSize: 14, fontWeight: '600' },
+  pillTextSelected: { color: Colors.primary, fontWeight: '700' },
   continueButton: {
-    backgroundColor: '#FF4667', borderRadius: 28, padding: 18,
-    alignItems: 'center', marginTop: 'auto',
+    borderRadius: Radius['2xl'], overflow: 'hidden', ...Shadow.md, marginTop: 'auto',
   },
-  continueButtonDisabled: { backgroundColor: '#ccc' },
-  continueButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  continueButtonDisabled: { shadowOpacity: 0, elevation: 0 },
+  continueGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  continueButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
 });
