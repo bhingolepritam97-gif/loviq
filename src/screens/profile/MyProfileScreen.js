@@ -6,13 +6,13 @@ import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../th
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import ProfileScoreCard from '../../components/ProfileScoreCard';
 
 export default function MyProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const { profile } = useAuth();
 
-  const [checklistOpen, setChecklistOpen] = useState(false);
   const [boostSeconds, setBoostSeconds] = useState(0);
 
   useEffect(() => {
@@ -22,24 +22,6 @@ export default function MyProfileScreen({ navigation }) {
     }, 1000);
     return () => clearInterval(interval);
   }, [boostSeconds]);
-
-  // Define checklist steps
-  const checklist = {
-    bio: !!profile?.bio,
-    photos: !!(profile?.photos && profile.photos.length >= 2),
-    work: !!(profile?.job || profile?.school || profile?.occupation),
-    verified: !!profile?.isVerified,
-  };
-
-  const checklistItems = [
-    { key: 'bio', label: 'Write a bio', icon: 'document-text-outline' },
-    { key: 'photos', label: 'Add 2 or more photos', icon: 'camera-outline' },
-    { key: 'work', label: 'Add your work or school', icon: 'briefcase-outline' },
-    { key: 'verified', label: 'Get verified', icon: 'shield-checkmark-outline' },
-  ];
-
-  const doneCount = Object.values(checklist).filter(Boolean).length;
-  const completionPct = Math.round((doneCount / checklistItems.length) * 100);
 
   const activateBoost = () => {
     if (boostSeconds > 0) return;
@@ -78,7 +60,7 @@ export default function MyProfileScreen({ navigation }) {
               <Ionicons name="checkmark-circle" size={22} color={Colors.primary} style={{ marginTop: 2 }} />
             )}
           </View>
-          <Text style={styles.jobText}>📍 {profile?.location?.cityName || 'Earth'}</Text>
+          <Text style={styles.jobText}>📍 {profile?.cityName || 'Earth'}</Text>
           
           {/* Preview my profile */}
           <TouchableOpacity 
@@ -89,47 +71,12 @@ export default function MyProfileScreen({ navigation }) {
             <Text style={styles.previewButtonText}>Preview my profile</Text>
           </TouchableOpacity>
 
-          {/* Profile Completion Bar */}
-          <View style={styles.completionContainer}>
-            <TouchableOpacity 
-              style={styles.completionHeader} 
-              activeOpacity={0.7}
-              onPress={() => setChecklistOpen(!checklistOpen)}
-            >
-              <Text style={styles.completionText}>
-                Profile is {completionPct}% complete
-              </Text>
-              <Ionicons 
-                name={checklistOpen ? 'chevron-up' : 'chevron-forward'} 
-                size={16} 
-                color={Colors.primary} 
-              />
-            </TouchableOpacity>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${completionPct}%` }]} />
-            </View>
-
-            {checklistOpen && (
-              <View style={styles.checklistDropdown}>
-                {checklistItems.map(item => {
-                  const done = checklist[item.key];
-                  return (
-                    <View key={item.key} style={styles.checklistItem}>
-                      <Ionicons 
-                        name={done ? 'checkmark-circle' : 'ellipse-outline'} 
-                        size={20} 
-                        color={done ? '#10b981' : Colors.textMuted} 
-                      />
-                      <Ionicons name={item.icon} size={16} color={Colors.textMuted} style={{ marginLeft: 6 }} />
-                      <Text style={[styles.checklistLabel, done && styles.checklistLabelDone]}>
-                        {item.label}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-          </View>
+          {/* Profile Completeness Score Card */}
+          <ProfileScoreCard
+            profile={profile}
+            style={{ width: '100%', marginTop: Spacing.lg }}
+            onItemPress={(route) => navigation.navigate(route)}
+          />
         </View>
 
         {/* Floating Quick Action Buttons */}
@@ -236,20 +183,8 @@ const styles = StyleSheet.create({
   editBadge: { position: 'absolute', bottom: 4, right: 12, backgroundColor: Colors.surface, width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', ...Shadow.sm, borderWidth: 1, borderColor: Colors.border },
   editBadgeIcon: { fontSize: 14 },
   
-  completionContainer: { width: '100%', marginTop: Spacing.lg, paddingHorizontal: Spacing.lg },
-  completionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 6 },
-  completionText: { fontSize: 13, fontWeight: '700', color: Colors.text },
-  completionAction: { fontSize: 12, fontWeight: '800', color: Colors.primary },
-  progressBarBg: { height: 8, backgroundColor: Colors.border, borderRadius: 4, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 4 },
-  
-  previewButton: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.full, borderHeight: 1, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.md, backgroundColor: Colors.surface },
+  previewButton: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.md, backgroundColor: Colors.surface },
   previewButtonText: { fontSize: 12, fontWeight: '600', color: Colors.textMuted },
-  
-  checklistDropdown: { marginTop: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border },
-  checklistItem: { flexDirection: 'row', alignItems: 'center', py: 6, paddingVertical: 6 },
-  checklistLabel: { fontSize: 13, color: Colors.text, marginLeft: Spacing.sm },
-  checklistLabelDone: { color: Colors.textMuted, textDecorationLine: 'line-through' },
   
   actionRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', width: '100%', gap: Spacing.xl, marginBottom: Spacing['2xl'] },
   actionButton: { alignItems: 'center', backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.lg, width: 84, height: 84, justifyContent: 'center', ...Shadow.sm },

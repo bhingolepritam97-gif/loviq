@@ -63,6 +63,8 @@ function mapBackendUserToProfile(u) {
     // Derived convenience fields for components that use legacy naming
     distance_range: Math.round((u.maxDistanceKm ?? u.max_distance_km ?? 80.5) / 1.60934),
     age_range: [u.ageMin ?? u.age_min ?? 18, u.ageMax ?? u.age_max ?? 65],
+    // Profile excellence score (0-100)
+    profileScore: u.profileScore ?? u.profile_score ?? null,
   };
 }
 
@@ -115,6 +117,8 @@ export const updateUserProfile = async (uid, data) => {
   if (data.starSign !== undefined) payload.starSign = data.starSign;
   if (data.anthemSong !== undefined) payload.anthemSong = data.anthemSong;
   if (data.anthemArtist !== undefined) payload.anthemArtist = data.anthemArtist;
+  // Profile excellence score (calculated client-side, stored for analytics/future ranking)
+  if (data.profileScore !== undefined) payload.profileScore = data.profileScore;
   // Discovery filter preferences
   if (data.ageMin !== undefined) payload.ageMin = data.ageMin;
   if (data.ageMax !== undefined) payload.ageMax = data.ageMax;
