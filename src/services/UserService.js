@@ -1,4 +1,7 @@
 import { apiClient } from '../api/client';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { geohashForPoint } from 'geofire-common';
 
 function mapBackendUserToProfile(u) {
   if (!u) return null;
@@ -46,6 +49,13 @@ function mapBackendUserToProfile(u) {
     cityName: u.cityName || '',
     isActive: u.isActive !== undefined ? u.isActive : (u.is_active !== undefined ? u.is_active : true),
     hideDistance: u.hideDistance !== undefined ? u.hideDistance : (u.hide_distance !== undefined ? u.hide_distance : false),
+    height: u.height || null,
+    exercise: u.exercise || null,
+    drinking: u.drinking || null,
+    pets: u.pets || null,
+    starSign: u.starSign || u.star_sign || null,
+    anthemSong: u.anthemSong || u.anthem_song || null,
+    anthemArtist: u.anthemArtist || u.anthem_artist || null,
   };
 }
 
@@ -58,7 +68,7 @@ export const getUserProfile = async (uid) => {
     return null;
   } catch (err) {
     console.warn('Error fetching user profile from backend REST API:', err.message);
-    return null;
+    throw err;
   }
 };
 
@@ -91,6 +101,13 @@ export const updateUserProfile = async (uid, data) => {
   if (data.isVerified !== undefined) payload.isVerified = data.isVerified;
   if (data.isActive !== undefined) payload.isActive = data.isActive;
   if (data.hideDistance !== undefined) payload.hideDistance = data.hideDistance;
+  if (data.height !== undefined) payload.height = data.height;
+  if (data.exercise !== undefined) payload.exercise = data.exercise;
+  if (data.drinking !== undefined) payload.drinking = data.drinking;
+  if (data.pets !== undefined) payload.pets = data.pets;
+  if (data.starSign !== undefined) payload.starSign = data.starSign;
+  if (data.anthemSong !== undefined) payload.anthemSong = data.anthemSong;
+  if (data.anthemArtist !== undefined) payload.anthemArtist = data.anthemArtist;
   
   const lat = data.location?.latitude !== undefined ? data.location.latitude : data.latitude;
   const lng = data.location?.longitude !== undefined ? data.location.longitude : data.longitude;
@@ -110,7 +127,32 @@ export const updateUserProfile = async (uid, data) => {
       body: payload
     });
     if (response.success && response.user) {
-      return mapBackendUserToProfile(response.user);
+      const mapped = mapBackendUserToProfile(response.user);
+
+      // ── Firestore geohash write (fire-and-forget) ───────────────────────
+      // The client-side EmptyStateScreen fallback (profileFeedLogic.js) uses
+      // geofire-common geohash queries against the Firestore `profiles` collection.
+      // We keep that field in sync here so the fallback always has accurate data.
+      if (lat !== undefined && lng !== undefined && uid && db) {
+        const geohash = geohashForPoint([lat, lng]);
+        setDoc(
+          doc(db, 'profiles', uid),
+          {
+            location: {
+              latitude: lat,
+              longitude: lng,
+              geohash,
+            },
+            ...(city !== undefined ? { cityName: city } : {}),
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        ).catch((err) =>
+          console.warn('[UserService] Firestore geohash write failed (non-critical):', err.message)
+        );
+      }
+
+      return mapped;
     }
     return null;
   } catch (err) {

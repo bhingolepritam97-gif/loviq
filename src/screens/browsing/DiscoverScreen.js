@@ -5,11 +5,14 @@ import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../th
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
-import { subscribeToPotentialMatches, recordSwipe } from '../../services/DiscoverService';
+import { subscribeToPotentialMatches, recordSwipe, notifyDeckSwipe } from '../../services/DiscoverService';
 import { useDeferredOnboardingPrompts } from '../../hooks/useDeferredOnboardingPrompts';
+import { useLocationCapture } from '../../hooks/useLocationCapture';
 import { getGracePeriodStatus } from '../../utils/gracePeriod';
 import VerifiedBadge from '../../components/VerifiedBadge';
 import EmptyStateScreen from './EmptyStateScreen';
+import BrandHeader from '../../components/brand/BrandHeader';
+import { Brand } from '../../components/brand/brand';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 0.28 * width;
@@ -22,11 +25,21 @@ export default function DiscoverScreen({ navigation, route }) {
   const rewindTimeout = useRef(null);
   const insets = useSafeAreaInsets();
   const position = useRef(new Animated.ValueXY()).current;
-  const { user, profile } = useAuth();
+  const { user, profile, setProfile } = useAuth();
 
   const [error, setError] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  
+
+  // Location capture — hook replaces the inline 'auto-heal' block below
+  const { captureLocation } = useLocationCapture({
+    user,
+    profile,
+    onLocationSaved: (updatedProfile) => {
+      setProfile(updatedProfile);
+      setRefreshTrigger((prev) => prev + 1);
+    },
+  });
+
   // Track daily likes (simplified for client-side demo)
   const [likesCount, setLikesCount] = useState(0);
   const FREE_DAILY_LIKES = 10;
@@ -60,52 +73,24 @@ export default function DiscoverScreen({ navigation, route }) {
     if (user && profile) {
       setLoading(true);
       setError(null);
-      
-      // Auto-heal missing location coordinates
-      if (!profile.location || !profile.location.latitude) {
-        (async () => {
-          try {
-            const Location = require('expo-location');
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status === 'granted') {
-              const loc = await Location.getCurrentPositionAsync({});
-              if (loc && loc.coords) {
-                const { updateUserProfile } = require('../../services/UserService');
-                let cityName = 'Pune';
-                try {
-                  const response = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-                  cityName = response?.[0]?.city || response?.[0]?.subregion || cityName;
-                } catch (e) {
-                  console.warn('Auto-heal reverse geocode failed:', e.message);
-                }
-                
-                await updateUserProfile(user.uid, {
-                  location: {
-                    latitude: loc.coords.latitude,
-                    longitude: loc.coords.longitude,
-                    cityName
-                  }
-                });
-                setRefreshTrigger(prev => prev + 1);
-              }
-            }
-          } catch (err) {
-            console.warn('Auto-healing location failed:', err.message);
-          }
-        })();
+
+      // Trigger location capture if the profile is missing coordinates.
+      // captureLocation is idempotent — it's a no-op if location is already set.
+      if (!profile.location?.latitude) {
+        captureLocation();
       }
-      
+
       const unsubscribe = subscribeToPotentialMatches(user.uid, profile, (potential) => {
         setProfiles(potential);
         setLoading(false);
       });
-      
+
       return unsubscribe;
     } else {
       setLoading(false);
       return () => {};
     }
-  }, [user, profile, refreshTrigger, route?.params?.profiles]);
+  }, [user, profile, refreshTrigger, route?.params?.profiles, captureLocation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -238,6 +223,10 @@ export default function DiscoverScreen({ navigation, route }) {
     setProfiles(prev => prev.slice(1));
     setActivePhotoIndex(0);
     position.setValue({ x: 0, y: 0 });
+
+    // Notify the deck cache that a card was consumed — triggers background
+    // refetch if remaining cards fall at or below the low-deck threshold.
+    notifyDeckSwipe();
 
     if (direction === 'left') {
       setLastSwipedProfile(swipedProfile);
@@ -525,15 +514,10 @@ export default function DiscoverScreen({ navigation, route }) {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Top Bar */}
-      <View style={styles.topBar}>
-        <Text style={styles.logoText}>💜 Vela</Text>
-        <TouchableOpacity 
-          style={styles.iconButton}
-          onPress={() => navigation.navigate('Filters')}
-        >
-          <Text style={styles.icon}>⚙️</Text>
-        </TouchableOpacity>
-      </View>
+      <BrandHeader 
+        rightIcon="options-outline" 
+        onRightPress={() => navigation.navigate('Filters')} 
+      />
 
       {/* Main Stack */}
       <View style={styles.stackArea}>
@@ -605,12 +589,8 @@ export default function DiscoverScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, justifyContent: 'space-between' },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, height: 60 },
-  logoText: { fontSize: Typography.fontSize['2xl'], fontWeight: '800', color: Colors.primary },
-  iconButton: { width: 40, height: 40, borderRadius: Radius.xl, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', ...Shadow.sm },
-  icon: { fontSize: 20 },
   stackArea: { flex: 1, marginHorizontal: Spacing.md, marginVertical: Spacing.sm, justifyContent: 'center', alignItems: 'center', position: 'relative' },
-  card: { width: '100%', height: '100%', borderRadius: Radius['2xl'], overflow: 'hidden', position: 'absolute', backgroundColor: Colors.surfaceElevated, ...Shadow.lg },
+  card: { width: '100%', height: '100%', borderRadius: Radius.lg, overflow: 'hidden', position: 'absolute', backgroundColor: Colors.surfaceElevated, ...Shadow.md },
   image: { width: '100%', height: '100%', resizeMode: 'cover' },
   scrim: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '48%', justifyContent: 'flex-end', padding: Spacing.xl },
   infoArea: { width: '100%' },
@@ -631,21 +611,21 @@ const styles = StyleSheet.create({
   interestText: { fontSize: 11, fontWeight: '700', color: Colors.white },
 
   stamp: { position: 'absolute', top: 48, borderWidth: 4, borderRadius: Radius.md, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, zIndex: 100, backgroundColor: 'rgba(255,255,255,0.15)' },
-  likeStamp: { left: 40, borderColor: Colors.success, transform: [{ rotate: '-10deg' }] },
+  likeStamp: { left: 40, borderColor: '#C6602E', transform: [{ rotate: '-10deg' }] },
   nopeStamp: { right: 40, borderColor: Colors.error, transform: [{ rotate: '10deg' }] },
   superLikeStamp: { alignSelf: 'center', bottom: 120, top: 'auto', borderColor: '#3b82f6', transform: [{ rotate: '-5deg' }], backgroundColor: 'rgba(59, 130, 246, 0.15)' },
-  likeText: { fontSize: 32, fontWeight: '900', color: Colors.success, letterSpacing: 2 },
+  likeText: { fontSize: 32, fontWeight: '900', color: '#C6602E', letterSpacing: 2 },
   nopeText: { fontSize: 32, fontWeight: '900', color: Colors.error, letterSpacing: 2 },
   superLikeText: { fontSize: 26, fontWeight: '900', color: '#3b82f6', letterSpacing: 1 },
   
   buttonRow: { flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center', paddingBottom: Spacing.lg, paddingHorizontal: Spacing.md },
   circleButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', ...Shadow.md },
-  rewind: { width: 44, height: 44, borderRadius: 22 },
-  nope: { width: 62, height: 62, borderRadius: 31, borderWidth: 1.5, borderColor: Colors.border },
-  superLike: { width: 48, height: 48, borderRadius: Radius["2xl"] },
+  rewind: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: '#12202E' },
+  nope: { width: 62, height: 62, borderRadius: 31, borderWidth: 1.5, borderColor: '#12202E' },
+  superLike: { width: 48, height: 48, borderRadius: Radius.lg, borderWidth: 1.5, borderColor: '#12202E' },
   like: { width: 62, height: 62, borderRadius: 31, overflow: 'hidden', shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 15, elevation: 8 },
   likeBtnGradient: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
-  boost: { width: 44, height: 44, borderRadius: 22 },
+  boost: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: '#12202E' },
   btnEmoji: { fontSize: 22 },
   btnEmojiLike: { fontSize: 26 },
 
@@ -657,7 +637,7 @@ const styles = StyleSheet.create({
   retryButtonGradient: { paddingVertical: Spacing.md, alignItems: 'center' },
   retryButtonText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
   
-  skeletonCard: { width: '100%', height: '100%', borderRadius: Radius['2xl'], overflow: 'hidden', backgroundColor: Colors.border, position: 'absolute' },
+  skeletonCard: { width: '100%', height: '100%', borderRadius: Radius.lg, overflow: 'hidden', backgroundColor: Colors.border, position: 'absolute' },
   skeletonImage: { width: '100%', height: '100%', backgroundColor: Colors.border },
   skeletonTitle: { width: '60%', height: 32, borderRadius: Radius.sm, backgroundColor: 'rgba(255,255,255,0.2)', marginBottom: Spacing.sm },
   skeletonText: { width: '80%', height: 16, borderRadius: Radius.sm, backgroundColor: 'rgba(255,255,255,0.2)', marginBottom: Spacing.xs },

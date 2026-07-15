@@ -1,6 +1,14 @@
 const { sequelize } = require("../models");
 
-// GET /deck?limit=20
+// GET /deck?limit=20&maxDistanceKm=50&after_id=<uuid>
+//
+// Returns a page of candidate profiles sorted by:
+//   1. distance ASC  (closest first)
+//   2. last_active_at DESC  (most-recently-active as tiebreaker within ~1 km)
+//
+// Cursor pagination: pass ?after_id=<uuid of last card seen> to get the next page.
+// The cursor is keyset-based (distance, id) so it stays stable even when rows are
+// inserted or deleted mid-session.
 async function getDeck(req, res) {
   try {
     const me = req.dbUser;
@@ -13,9 +21,10 @@ async function getDeck(req, res) {
       });
     }
 
-    // Cap max distance to 200km to prevent DB strain
-    let maxDistanceMeters = (req.query.maxDistanceKm ? parseFloat(req.query.maxDistanceKm) : 50) * 1000;
-    if (maxDistanceMeters > 200000) maxDistanceMeters = 200000; 
+    // Cap max distance to 200 km to prevent DB strain
+    let maxDistanceMeters =
+      (req.query.maxDistanceKm ? parseFloat(req.query.maxDistanceKm) : 50) * 1000;
+    if (maxDistanceMeters > 200000) maxDistanceMeters = 200000;
 
     // Age preferences (fallback to broad range if not set)
     const ageMin = me.ageMin || 18;
@@ -23,14 +32,43 @@ async function getDeck(req, res) {
 
     const [myLng, myLat] = me.location.coordinates;
 
+    // ── Cursor: resolve the distance of the last-seen card ─────────────────
+    let cursorDistance = null;
+    let cursorId = null;
+
+    if (req.query.after_id) {
+      const afterId = req.query.after_id;
+      const [[cursorRow]] = await sequelize.query(
+        `SELECT ST_Distance(location, ST_SetSRID(ST_MakePoint(:myLng, :myLat), 4326)::geography) AS d
+         FROM users WHERE id = :afterId LIMIT 1`,
+        { replacements: { myLng, myLat, afterId } }
+      );
+      if (cursorRow) {
+        cursorDistance = cursorRow.d;
+        cursorId = afterId;
+      }
+    }
+
+    // ── Main query ─────────────────────────────────────────────────────────
     const [candidates] = await sequelize.query(
       `
       SELECT
-        u.id, u.name, u.birthdate, u.gender, u.bio, u.interests, u.hide_distance,
-        ST_Distance(u.location, ST_SetSRID(ST_MakePoint(:myLng, :myLat), 4326)::geography) AS distance_meters,
+        u.id, u.name, u.birthdate, u.gender, u.bio, u.interests,
+        u.hide_distance, u.city_name AS "cityName",
+        u.is_verified AS "isVerified",
+        u.last_active_at AS "lastActiveAt",
+        u.height, u.exercise, u.drinking, u.pets,
+        u.star_sign AS "starSign",
+        u.anthem_song AS "anthemSong",
+        u.anthem_artist AS "anthemArtist",
+        ST_Distance(
+          u.location,
+          ST_SetSRID(ST_MakePoint(:myLng, :myLat), 4326)::geography
+        ) AS distance_meters,
         COALESCE(
-          json_agg(json_build_object('id', p.id, 'url', p.url, 'order', p."order"))
-            FILTER (WHERE p.id IS NOT NULL),
+          json_agg(
+            json_build_object('id', p.id, 'url', p.url, 'order', p."order")
+          ) FILTER (WHERE p.id IS NOT NULL),
           '[]'
         ) AS photos
       FROM users u
@@ -38,17 +76,21 @@ async function getDeck(req, res) {
       WHERE u.id != :myId
         AND u.is_active = true
         AND u.profile_completed = true
-        AND ST_DWithin(u.location, ST_SetSRID(ST_MakePoint(:myLng, :myLat), 4326)::geography, :maxDistance)
+        AND ST_DWithin(
+              u.location,
+              ST_SetSRID(ST_MakePoint(:myLng, :myLat), 4326)::geography,
+              :maxDistance
+            )
         AND EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.birthdate)) BETWEEN :ageMin AND :ageMax
         AND (
           'Everyone' = ANY(ARRAY[:myGenderPrefs]::varchar[])
           OR ('Women' = ANY(ARRAY[:myGenderPrefs]::varchar[]) AND u.gender = 'Woman')
-          OR ('Men' = ANY(ARRAY[:myGenderPrefs]::varchar[]) AND u.gender = 'Man')
+          OR ('Men'   = ANY(ARRAY[:myGenderPrefs]::varchar[]) AND u.gender = 'Man')
         )
         AND (
           'Everyone' = ANY(u.gender_preference)
           OR (:myGender = 'Woman' AND 'Women' = ANY(u.gender_preference))
-          OR (:myGender = 'Man' AND 'Men' = ANY(u.gender_preference))
+          OR (:myGender = 'Man'   AND 'Men'   = ANY(u.gender_preference))
         )
         AND u.id NOT IN (
           SELECT swiped_id FROM swipes WHERE swiper_id = :myId
@@ -59,8 +101,15 @@ async function getDeck(req, res) {
         AND u.id NOT IN (
           SELECT blocker_id FROM blocks WHERE blocked_id = :myId
         )
+        -- Keyset cursor: skip everything at or before the last-seen (distance, id) pair
+        ${cursorDistance !== null
+          ? `AND (
+               ST_Distance(u.location, ST_SetSRID(ST_MakePoint(:myLng, :myLat), 4326)::geography),
+               u.id::text
+             ) > (:cursorDistance, :cursorId)`
+          : ''}
       GROUP BY u.id
-      ORDER BY distance_meters ASC
+      ORDER BY distance_meters ASC, u.last_active_at DESC
       LIMIT :limit
       `,
       {
@@ -74,20 +123,32 @@ async function getDeck(req, res) {
           ageMin,
           ageMax,
           limit,
+          ...(cursorDistance !== null ? { cursorDistance, cursorId } : {}),
         },
       }
     );
 
-    // Filter out distance_meters for privacy
-    const processedCandidates = candidates.map(c => {
+    // Filter out distance_meters for privacy if user opted in to hideDistance
+    const processedCandidates = candidates.map((c) => {
       if (c.hide_distance) {
         c.distance_meters = null;
       }
-      delete c.hide_distance; // don't need to send this boolean to the client
+      delete c.hide_distance;
       return c;
     });
 
-    res.json({ success: true, candidates: processedCandidates });
+    // Return the id of the last candidate so the client can use it as a cursor
+    const nextCursor =
+      processedCandidates.length > 0
+        ? processedCandidates[processedCandidates.length - 1].id
+        : null;
+
+    res.json({
+      success: true,
+      candidates: processedCandidates,
+      nextCursor,                              // null when this is the last page
+      hasMore: processedCandidates.length === limit,
+    });
   } catch (error) {
     console.error("[deckController] getDeck error:", error);
     res.status(500).json({ success: false, error: "Failed to load deck" });

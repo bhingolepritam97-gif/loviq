@@ -6,6 +6,38 @@ import { registerForPushNotificationsAsync } from '../services/PushService';
 import { Purchases } from '../services/RevenueCatService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+/**
+ * captureLocationForUser — plain async helper (not a hook) so it can be
+ * called outside a component render cycle (e.g. inside onAuthStateChanged).
+ */
+async function captureLocationForUser(uid, existingProfile) {
+  // Skip if location is already stored
+  if (existingProfile?.location?.latitude) return null;
+  try {
+    const Location = await import('expo-location');
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return null;
+
+    const loc = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy?.Balanced ?? 3,
+    });
+    if (!loc?.coords) return null;
+
+    const { latitude, longitude } = loc.coords;
+    let cityName = 'Nearby';
+    try {
+      const places = await Location.reverseGeocodeAsync({ latitude, longitude });
+      cityName = places?.[0]?.city || places?.[0]?.subregion || places?.[0]?.region || cityName;
+    } catch (_) { /* non-critical */ }
+
+    // updateUserProfile handles REST PATCH + Firestore geohash write
+    return await updateUserProfile(uid, { location: { latitude, longitude, cityName } });
+  } catch (err) {
+    console.warn('[AuthContext] Background location capture failed (non-critical):', err.message);
+    return null;
+  }
+}
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -34,16 +66,29 @@ export const AuthProvider = ({ children }) => {
         try {
           let userProfile = null;
 
-          // 4-second timeout limit for fetching profile from Postgres
+          // 20-second timeout limit for fetching profile from Postgres (handles cold-starts)
           const fetchPromise = getUserProfile(firebaseUser.uid);
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Profile fetch timed out')), 4000)
+            setTimeout(() => reject(new Error('Profile fetch timed out')), 20000)
           );
 
+          let isAuthError = false;
           try {
             userProfile = await Promise.race([fetchPromise, timeoutPromise]);
           } catch (fetchErr) {
             console.warn('Profile fetch timed out or failed:', fetchErr.message);
+            if (fetchErr.message.includes('auth/') || fetchErr.message.includes('credential') || fetchErr.message.includes('token') || fetchErr.message.includes('Expired') || fetchErr.message.includes('Unauthorized')) {
+              isAuthError = true;
+            }
+          }
+
+          if (isAuthError) {
+            console.log('[AuthContext] Auth token invalid/expired. Logging out...');
+            setUser(null);
+            setProfile(null);
+            await signOut(auth);
+            setLoading(false);
+            return;
           }
           
           if (!userProfile) {
@@ -89,6 +134,16 @@ export const AuthProvider = ({ children }) => {
           
           // Register push notifications when user logs in
           registerForPushNotificationsAsync();
+
+          // Eagerly capture location after login if the profile doesn't have one yet.
+          // Fire-and-forget: update the profile in state if successful.
+          if (userProfile) {
+            captureLocationForUser(firebaseUser.uid, userProfile).then((updated) => {
+              if (updated) {
+                setProfile(updated);
+              }
+            });
+          }
         } catch (error) {
           console.warn("Error inside authStateChanged profile setup:", error.message);
           setConnectionError(true);
@@ -111,7 +166,7 @@ export const AuthProvider = ({ children }) => {
       try {
         const fetchPromise = getUserProfile(user.uid);
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Profile fetch timed out')), 4000)
+          setTimeout(() => reject(new Error('Profile fetch timed out')), 20000)
         );
         const userProfile = await Promise.race([fetchPromise, timeoutPromise]);
         if (userProfile) {
@@ -122,7 +177,14 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (err) {
         console.warn('Refresh profile failed:', err.message);
-        setConnectionError(true);
+        if (err.message.includes('auth/') || err.message.includes('credential') || err.message.includes('token') || err.message.includes('Expired') || err.message.includes('Unauthorized')) {
+          console.log('[AuthContext] Auth token invalid/expired during refresh. Logging out...');
+          setUser(null);
+          setProfile(null);
+          await signOut(auth);
+        } else {
+          setConnectionError(true);
+        }
       } finally {
         setLoading(false);
       }
