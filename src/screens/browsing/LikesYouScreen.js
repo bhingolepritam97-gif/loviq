@@ -18,19 +18,23 @@ export default function LikesYouScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
   const [likes, setLikes] = useState([]);
+  const [sentLikes, setSentLikes] = useState([]);
+  const [activeTab, setActiveTab] = useState('received'); // 'received' or 'sent'
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchLikes = async () => {
+    const fetchSwipesData = async () => {
       if (!user) return;
+      setLoading(true);
       try {
-        // Find users who liked or super_liked the current user
         const swipesRef = collection(db, 'swipes');
-        const q = query(swipesRef, where('to', '==', user.uid), where('action', 'in', ['like', 'super_like']));
-        const querySnapshot = await getDocs(q);
+        
+        // 1. Fetch Received Likes (other users who liked me)
+        const qReceived = query(swipesRef, where('to', '==', user.uid), where('action', 'in', ['like', 'super_like']));
+        const snapshotReceived = await getDocs(qReceived);
         
         const likers = [];
-        for (const swipeDoc of querySnapshot.docs) {
+        for (const swipeDoc of snapshotReceived.docs) {
           const swipeData = swipeDoc.data();
           const userSnap = await getDoc(doc(db, 'profiles', swipeData.from));
           if (userSnap.exists()) {
@@ -42,21 +46,40 @@ export default function LikesYouScreen({ navigation }) {
             });
           }
         }
-        
-        // Remove duplicates just in case
         const uniqueLikers = Array.from(new Map(likers.map(item => [item.id, item])).values());
         setLikes(uniqueLikers);
+
+        // 2. Fetch Sent Likes (users I liked)
+        const qSent = query(swipesRef, where('from', '==', user.uid), where('action', 'in', ['like', 'super_like']));
+        const snapshotSent = await getDocs(qSent);
+        
+        const liked = [];
+        for (const swipeDoc of snapshotSent.docs) {
+          const swipeData = swipeDoc.data();
+          const userSnap = await getDoc(doc(db, 'profiles', swipeData.to));
+          if (userSnap.exists()) {
+            liked.push({
+              id: userSnap.id,
+              ...userSnap.data(),
+              isSuperLike: swipeData.action === 'super_like',
+              message: swipeData.message || null
+            });
+          }
+        }
+        const uniqueLiked = Array.from(new Map(liked.map(item => [item.id, item])).values());
+        setSentLikes(uniqueLiked);
       } catch (err) {
-        console.error('Error fetching likes:', err);
+        console.error('Error fetching swipes:', err);
       } finally {
         setLoading(false);
       }
     };
     
-    fetchLikes();
+    fetchSwipesData();
   }, [user]);
 
   const isPremium = profile?.isPremium;
+  const showUnblurred = activeTab === 'sent' || isPremium;
 
   const renderLiker = ({ item }) => {
     return (
@@ -64,7 +87,7 @@ export default function LikesYouScreen({ navigation }) {
         style={[styles.card, item.isSuperLike && styles.superLikeCard]} 
         activeOpacity={0.8}
         onPress={() => {
-          if (isPremium) {
+          if (showUnblurred) {
             navigation.navigate('ProfileDetail', { profile: item });
           } else {
             navigation.navigate('Profile', { screen: 'Premium' });
@@ -81,18 +104,18 @@ export default function LikesYouScreen({ navigation }) {
           </View>
         )}
         
-        {!isPremium && (
+        {!showUnblurred && (
           <BlurView intensity={80} tint="light" style={styles.blurOverlay} />
         )}
         
         {item.isSuperLike && (
           <View style={styles.superLikeBadge}>
             <Ionicons name="star" size={12} color="#fff" />
-            <Text style={styles.superLikeBadgeText}>SUPER LIKED YOU</Text>
+            <Text style={styles.superLikeBadgeText}>SUPER LIKED</Text>
           </View>
         )}
 
-        {isPremium && item.message && (
+        {showUnblurred && item.message && (
           <View style={styles.messageBadge}>
             <Ionicons name="chatbubble" size={12} color="#fff" />
             <Text style={styles.messageBadgeText} numberOfLines={2}>"{item.message}"</Text>
@@ -101,8 +124,8 @@ export default function LikesYouScreen({ navigation }) {
 
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.gradient}>
           <View style={styles.info}>
-            <Text style={styles.name}>{isPremium ? item.name : 'Secret Admirer'}</Text>
-            {isPremium ? (
+            <Text style={styles.name}>{showUnblurred ? item.name : 'Secret Admirer'}</Text>
+            {showUnblurred ? (
               <Text style={styles.age}>{item.age}</Text>
             ) : (
               <Text style={styles.teaserText}>
@@ -119,23 +142,50 @@ export default function LikesYouScreen({ navigation }) {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{likes.length} Likes</Text>
-        <Text style={styles.headerSubtitle}>Upgrade to Gold to see who liked you</Text>
+        <Text style={styles.headerTitle}>Likes</Text>
+        {activeTab === 'received' && !isPremium && (
+          <Text style={styles.headerSubtitle}>Upgrade to Gold to see who liked you</Text>
+        )}
+      </View>
+
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tabButton, activeTab === 'received' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('received')}
+        >
+          <Text style={[styles.tabButtonText, activeTab === 'received' && styles.tabButtonTextActive]}>
+            Likes You ({likes.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabButton, activeTab === 'sent' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('sent')}
+        >
+          <Text style={[styles.tabButtonText, activeTab === 'sent' && styles.tabButtonTextActive]}>
+            Sent ({sentLikes.length})
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.gold} />
         </View>
-      ) : likes.length === 0 ? (
+      ) : (activeTab === 'received' ? likes.length : sentLikes.length) === 0 ? (
         <View style={styles.center}>
           <Ionicons name="heart-outline" size={64} color={Colors.border} />
-          <Text style={styles.emptyTitle}>No likes yet</Text>
-          <Text style={styles.emptySubtitle}>Keep swiping! When someone likes you back, they'll appear here.</Text>
+          <Text style={styles.emptyTitle}>
+            {activeTab === 'received' ? 'No likes yet' : 'No likes sent yet'}
+          </Text>
+          <Text style={styles.emptySubtitle}>
+            {activeTab === 'received' 
+              ? "Keep swiping! When someone likes you, they'll appear here." 
+              : "Swipe right on profiles in Discover to show your interest!"}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={likes}
+          data={activeTab === 'received' ? likes : sentLikes}
           keyExtractor={item => item.id}
           renderItem={renderLiker}
           numColumns={numColumns}
@@ -145,7 +195,7 @@ export default function LikesYouScreen({ navigation }) {
         />
       )}
 
-      {!isPremium && (
+      {activeTab === 'received' && !isPremium && (
         <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md }]}>
           <TouchableOpacity 
             style={styles.upgradeBtn}
@@ -168,12 +218,39 @@ export default function LikesYouScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { padding: Spacing.lg, paddingBottom: Spacing.md },
+  header: { padding: Spacing.lg, paddingBottom: Spacing.sm },
   headerTitle: { fontSize: 24, fontWeight: '800', color: Colors.text },
   headerSubtitle: { fontSize: 14, color: Colors.textMuted, marginTop: 4 },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.full,
+    padding: 4,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    borderRadius: Radius.full,
+  },
+  tabButtonActive: {
+    backgroundColor: Colors.primary,
+  },
+  tabButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textMuted,
+  },
+  tabButtonTextActive: {
+    color: Colors.white,
+  },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginTop: Spacing.md },
-  emptySubtitle: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.sm },
+  emptySubtitle: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.sm, paddingHorizontal: Spacing.md },
   list: { paddingHorizontal: Spacing.lg, paddingBottom: 120 },
   columnWrapper: { justifyContent: 'space-between', marginBottom: Spacing.md },
   card: { width: cardWidth, height: cardWidth * 1.3, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm, borderWidth: 2, borderColor: 'transparent' },

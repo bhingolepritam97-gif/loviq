@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity, Image, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TouchableOpacity, Image, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import Avatar from '../../components/Avatar';
 import { useAuth } from '../../context/AuthContext';
 import { fetchMatchMessages, sendMessage, subscribeToMessages, updateTypingStatus, markMessagesAsRead } from '../../services/ChatService';
 import { socketService } from '../../api/socket';
+import { uploadImageToFirebase, pickImageFromLibrary, takePhotoWithCamera, requestCameraAndGalleryPermissions } from '../../services/ImageService';
 
 export default function ChatScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -18,10 +19,68 @@ export default function ChatScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const typingTimeoutRef = useRef(null);
   const flatListRef = useRef(null);
   const { user } = useAuth();
+
+  const handleAttach = async () => {
+    const hasPerms = await requestCameraAndGalleryPermissions();
+    if (!hasPerms) {
+      Alert.alert('Permission Denied', 'Camera and gallery access is required to share photos.');
+      return;
+    }
+
+    Alert.alert(
+      'Share Image',
+      'Choose an option to upload and share an image',
+      [
+        {
+          text: 'Camera',
+          onPress: async () => {
+            try {
+              const res = await takePhotoWithCamera();
+              if (!res.canceled && res.assets?.[0]?.uri) {
+                uploadAndSendImage(res.assets[0].uri);
+              }
+            } catch (err) {
+              console.error('Camera capture error:', err);
+            }
+          }
+        },
+        {
+          text: 'Photo Library',
+          onPress: async () => {
+            try {
+              const res = await pickImageFromLibrary();
+              if (!res.canceled && res.assets?.[0]?.uri) {
+                uploadAndSendImage(res.assets[0].uri);
+              }
+            } catch (err) {
+              console.error('Gallery pick error:', err);
+            }
+          }
+        },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  const uploadAndSendImage = async (uri) => {
+    setIsUploading(true);
+    try {
+      const downloadURL = await uploadImageToFirebase(uri);
+      if (downloadURL) {
+        await proceedSend(`[image]${downloadURL}`);
+      }
+    } catch (error) {
+      console.error('Failed to upload image:', error);
+      Alert.alert('Upload Failed', 'Could not upload image. Please check your internet connection and try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (!matchId) return;
@@ -236,6 +295,9 @@ export default function ChatScreen({ route, navigation }) {
           scrollEventThrottle={16}
           renderItem={({ item }) => {
             const isMe = item.senderId === user?.uid;
+            const isImage = item.text && item.text.startsWith('[image]');
+            const imageUrl = isImage ? item.text.substring(7) : null;
+
             return (
               <View style={[styles.messageWrapper, isMe ? styles.wrapperMe : styles.wrapperOther]}>
                 <View style={[styles.messageRow, isMe ? styles.rowMe : styles.rowOther]}>
@@ -244,18 +306,30 @@ export default function ChatScreen({ route, navigation }) {
                   )}
                   
                   {isMe ? (
-                    <LinearGradient
-                      colors={Gradients.primary.colors}
-                      start={Gradients.primary.start}
-                      end={Gradients.primary.end}
-                      style={[styles.bubble, styles.bubbleMe]}
-                    >
-                      <Text style={[styles.bubbleText, styles.textMe]}>{item.text}</Text>
-                    </LinearGradient>
+                    isImage ? (
+                      <View style={[styles.bubble, styles.bubbleMe, { padding: 4, overflow: 'hidden' }]}>
+                        <Image source={{ uri: imageUrl }} style={styles.bubbleImage} />
+                      </View>
+                    ) : (
+                      <LinearGradient
+                        colors={Gradients.primary.colors}
+                        start={Gradients.primary.start}
+                        end={Gradients.primary.end}
+                        style={[styles.bubble, styles.bubbleMe]}
+                      >
+                        <Text style={[styles.bubbleText, styles.textMe]}>{item.text}</Text>
+                      </LinearGradient>
+                    )
                   ) : (
-                    <View style={[styles.bubble, styles.bubbleOther]}>
-                      <Text style={[styles.bubbleText, styles.textOther]}>{item.text}</Text>
-                    </View>
+                    isImage ? (
+                      <View style={[styles.bubble, styles.bubbleOther, { padding: 4, overflow: 'hidden' }]}>
+                        <Image source={{ uri: imageUrl }} style={styles.bubbleImage} />
+                      </View>
+                    ) : (
+                      <View style={[styles.bubble, styles.bubbleOther]}>
+                        <Text style={[styles.bubbleText, styles.textOther]}>{item.text}</Text>
+                      </View>
+                    )
                   )}
                 </View>
                 <View style={styles.timestampRow}>
@@ -275,16 +349,24 @@ export default function ChatScreen({ route, navigation }) {
             );
           }}
           ListFooterComponent={
-            isTyping ? (
-              <View style={[styles.messageWrapper, styles.wrapperOther, { marginBottom: Spacing.sm }]}>
-                <View style={[styles.messageRow, styles.rowOther]}>
-                  <Image source={{ uri: profile.photos?.[0] }} style={styles.bubbleAvatar} />
-                  <View style={[styles.bubble, styles.bubbleOther, { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm }]}>
-                    <Text style={[styles.bubbleText, styles.textOther, { fontStyle: 'italic', color: Colors.textMuted }]}>Typing...</Text>
+            <View>
+              {isTyping && (
+                <View style={[styles.messageWrapper, styles.wrapperOther, { marginBottom: Spacing.sm }]}>
+                  <View style={[styles.messageRow, styles.rowOther]}>
+                    <Image source={{ uri: profile.photos?.[0] }} style={styles.bubbleAvatar} />
+                    <View style={[styles.bubble, styles.bubbleOther, { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm }]}>
+                      <Text style={[styles.bubbleText, styles.textOther, { fontStyle: 'italic', color: Colors.textMuted }]}>Typing...</Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-            ) : null
+              )}
+              {isUploading && (
+                <View style={{ paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm, alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                  <Text style={{ fontSize: 13, color: Colors.textMuted }}>Uploading image...</Text>
+                </View>
+              )}
+            </View>
           }
           contentContainerStyle={styles.messagesList}
           onContentSizeChange={() => {
@@ -305,7 +387,7 @@ export default function ChatScreen({ route, navigation }) {
       {/* Message Input Bar */}
       <View style={[styles.inputBar, { paddingBottom: Platform.OS === 'ios' ? insets.bottom : Spacing.md }]}>
         <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.attachBtn}>
+          <TouchableOpacity style={styles.attachBtn} onPress={handleAttach}>
             <Ionicons name="add" size={28} color={Colors.textMuted} />
           </TouchableOpacity>
           
@@ -384,4 +466,5 @@ const styles = StyleSheet.create({
   skeletonMe: { alignSelf: 'flex-end', borderBottomRightRadius: Radius.xs },
   skeletonOther: { alignSelf: 'flex-start', borderBottomLeftRadius: Radius.xs },
   scrollBottomBtn: { position: 'absolute', bottom: 80, right: Spacing.xl, width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', ...Shadow.md, zIndex: 100 },
+  bubbleImage: { width: 200, height: 200, borderRadius: Radius.md, resizeMode: 'cover' },
 });
