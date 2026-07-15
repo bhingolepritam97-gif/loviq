@@ -19,7 +19,7 @@ async function captureLocationForUser(uid, existingProfile) {
     if (status !== 'granted') return null;
 
     const loc = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy?.Balanced ?? 3,
+      accuracy: Location.Accuracy.High,
     });
     if (!loc?.coords) return null;
 
