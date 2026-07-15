@@ -15,6 +15,7 @@ async function getDeck(req, res) {
     const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
 
     if (!me.location) {
+      console.warn(`[Deck debug] User ${me.id} requested deck but has no location set.`);
       return res.status(400).json({
         success: false,
         error: "Set your location before requesting a deck",
@@ -34,6 +35,12 @@ async function getDeck(req, res) {
     const ageMax = me.ageMax || 100;
 
     const [myLng, myLat] = me.location.coordinates;
+    const myGender = me.gender || 'Woman';
+    const myGenderPrefs = me.genderPreference || ['Everyone'];
+
+    console.log(`[Deck debug] User requesting deck: ID=${me.id}, Gender=${myGender}, Prefs=${JSON.stringify(myGenderPrefs)}`);
+    console.log(`[Deck debug] User coordinates: lat=${myLat}, lng=${myLng}`);
+    console.log(`[Deck debug] Filter parameters: maxDistanceKm=${maxDistanceMeters / 1000}km, ageMin=${ageMin}, ageMax=${ageMax}`);
 
     // ── Cursor: resolve the distance of the last-seen card ─────────────────
     let cursorDistance = null;
@@ -49,6 +56,7 @@ async function getDeck(req, res) {
       if (cursorRow) {
         cursorDistance = cursorRow.d;
         cursorId = afterId;
+        console.log(`[Deck debug] Cursor ID=${cursorId}, distance=${cursorDistance}m`);
       }
     }
 
@@ -121,8 +129,8 @@ async function getDeck(req, res) {
           myLng,
           myLat,
           maxDistance: maxDistanceMeters,
-          myGender: me.gender || 'Woman',
-          myGenderPrefs: me.genderPreference || ['Everyone'],
+          myGender,
+          myGenderPrefs,
           ageMin,
           ageMax,
           limit,
@@ -130,6 +138,23 @@ async function getDeck(req, res) {
         },
       }
     );
+
+    console.log(`[Deck debug] Candidates returned from database: ${candidates.length}`);
+
+    // If candidate list is empty, gather DB statistics to figure out why
+    if (candidates.length === 0) {
+      console.log(`[Deck debug] Deck is empty. Fetching database statistics to troubleshoot...`);
+      const [[usersCount]] = await sequelize.query(`SELECT COUNT(*) as count FROM users`);
+      const [[completedCount]] = await sequelize.query(`SELECT COUNT(*) as count FROM users WHERE profile_completed = true`);
+      const [[swipesCount]] = await sequelize.query(`SELECT COUNT(*) as count FROM swipes WHERE swiper_id = :myId`, { replacements: { myId: me.id } });
+      const [[blocksCount]] = await sequelize.query(`SELECT COUNT(*) as count FROM blocks WHERE blocker_id = :myId`, { replacements: { myId: me.id } });
+      
+      console.log(`[Deck debug] Statistics:`);
+      console.log(` - Total users in DB: ${usersCount.count}`);
+      console.log(` - Profile completed users in DB: ${completedCount.count}`);
+      console.log(` - Profiles swiped by this user: ${swipesCount.count}`);
+      console.log(` - Profiles blocked by this user: ${blocksCount.count}`);
+    }
 
     // Filter out distance_meters for privacy if user opted in to hideDistance
     const processedCandidates = candidates.map((c) => {
@@ -159,3 +184,4 @@ async function getDeck(req, res) {
 }
 
 module.exports = { getDeck };
+

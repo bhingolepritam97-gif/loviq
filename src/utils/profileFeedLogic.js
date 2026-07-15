@@ -97,14 +97,29 @@ async function queryProfiles({
 
   const profilesRef = collection(db, 'profiles');
 
+  // 1. Log current user details before query
+  const myLat = userLocation?.latitude || userLocation?.lat || null;
+  const myLng = userLocation?.longitude || userLocation?.lng || null;
+  const myGeohash = (myLat && myLng) ? geofire.geohashForPoint([myLat, myLng]) : 'None';
+  console.log(`[Discover debug] Current User Uid: ${currentUserUid}`);
+  console.log(`[Discover debug] Coordinates: lat=${myLat}, lng=${myLng}`);
+  console.log(`[Discover debug] Calculated Geohash: ${myGeohash}`);
+  console.log(`[Discover debug] Search Radius: ${radiusMiles} miles`);
+
+  let rawCandidateCount = 0;
+  let selfOrBlockedFiltered = 0;
+  let swipedOrRecycledFiltered = 0;
+  let genderFiltered = 0;
+  let ageFiltered = 0;
+  let distanceFiltered = 0;
+
   // Location queries
-  if (userLocation?.latitude && userLocation?.longitude) {
-    const center = [userLocation.latitude, userLocation.longitude];
+  if (myLat && myLng) {
+    const center = [myLat, myLng];
     const radiusInM = radiusMiles * 1609.34;
     const bounds = geofire.geohashQueryBounds(center, radiusInM);
 
     const promises = bounds.map((b) => {
-      // Direct bounding geohash query (Firestore-safe)
       const q = query(
         profilesRef,
         where('location.geohash', '>=', b[0]),
@@ -117,8 +132,13 @@ async function queryProfiles({
 
     snapshots.forEach((snap) => {
       snap.forEach((docItem) => {
+        rawCandidateCount++;
         const id = docItem.id;
-        if (id === currentUserUid || blockedUsers.includes(id)) return;
+
+        if (id === currentUserUid || blockedUsers.includes(id)) {
+          selfOrBlockedFiltered++;
+          return;
+        }
 
         const data = docItem.data();
 
@@ -126,16 +146,28 @@ async function queryProfiles({
         const isSwiped = swipedIds.has(id);
         const isRecycled = recycledPassIds.has(id);
 
-        if (isSwiped) return;
-        if (isRecycled && !includeRecycledPasses) return;
+        if (isSwiped) {
+          swipedOrRecycledFiltered++;
+          return;
+        }
+        if (isRecycled && !includeRecycledPasses) {
+          swipedOrRecycledFiltered++;
+          return;
+        }
 
         // 2. Gender filtering (Hard Filter)
         const passesGender = interestedIn === 'Everyone' || data.gender === interestedIn;
-        if (!passesGender) return;
+        if (!passesGender) {
+          genderFiltered++;
+          return;
+        }
 
         // 3. Age filtering
         const passesAge = data.age >= minAge && data.age <= maxAge;
-        if (!passesAge) return;
+        if (!passesAge) {
+          ageFiltered++;
+          return;
+        }
 
         // 4. Distance check
         if (data.location?.latitude && data.location?.longitude) {
@@ -162,42 +194,82 @@ async function queryProfiles({
               distance: parseFloat(distanceInMiles.toFixed(1)),
               matchReason,
             });
+          } else {
+            distanceFiltered++;
           }
+        } else {
+          distanceFiltered++;
         }
       });
     });
+
+    console.log(`[Discover debug] Location Path Results:`);
+    console.log(` - Raw candidates in geohash bounds: ${rawCandidateCount}`);
+    console.log(` - Dropped (self/blocked): ${selfOrBlockedFiltered}`);
+    console.log(` - Dropped (swiped/cooldown): ${swipedOrRecycledFiltered}`);
+    console.log(` - Dropped (gender preference): ${genderFiltered}`);
+    console.log(` - Dropped (age range): ${ageFiltered}`);
+    console.log(` - Dropped (distance check): ${distanceFiltered}`);
+    console.log(` - Final matching candidates added to pool: ${pool.length}`);
+
   } else {
     // Global fallback
+    console.log(`[Discover debug] Entering Global Fallback Path (No location coordinates found on current user profile)`);
     const snap = await getDocs(query(profilesRef, limit(150)));
     snap.forEach((docItem) => {
+      rawCandidateCount++;
       const id = docItem.id;
-      if (id === currentUserUid || blockedUsers.includes(id)) return;
+      if (id === currentUserUid || blockedUsers.includes(id)) {
+        selfOrBlockedFiltered++;
+        return;
+      }
 
       const data = docItem.data();
       const isSwiped = swipedIds.has(id);
       const isRecycled = recycledPassIds.has(id);
 
-      if (isSwiped) return;
-      if (isRecycled && !includeRecycledPasses) return;
+      if (isSwiped) {
+        swipedOrRecycledFiltered++;
+        return;
+      }
+      if (isRecycled && !includeRecycledPasses) {
+        swipedOrRecycledFiltered++;
+        return;
+      }
 
       const passesGender = interestedIn === 'Everyone' || data.gender === interestedIn;
-      const passesAge = data.age >= minAge && data.age <= maxAge;
-
-      if (passesGender && passesAge) {
-        let matchReason = 'normal';
-        if (isRecycled) {
-          matchReason = 'recycled_pass';
-        } else if (data.age < ageRange[0] || data.age > ageRange[1]) {
-          matchReason = 'near_miss_age';
-        }
-
-        pool.push({
-          id,
-          ...data,
-          matchReason,
-        });
+      if (!passesGender) {
+        genderFiltered++;
+        return;
       }
+
+      const passesAge = data.age >= minAge && data.age <= maxAge;
+      if (!passesAge) {
+        ageFiltered++;
+        return;
+      }
+
+      let matchReason = 'normal';
+      if (isRecycled) {
+        matchReason = 'recycled_pass';
+      } else if (data.age < ageRange[0] || data.age > ageRange[1]) {
+        matchReason = 'near_miss_age';
+      }
+
+      pool.push({
+        id,
+        ...data,
+        matchReason,
+      });
     });
+
+    console.log(`[Discover debug] Global Fallback Path Results:`);
+    console.log(` - Raw profiles evaluated: ${rawCandidateCount}`);
+    console.log(` - Dropped (self/blocked): ${selfOrBlockedFiltered}`);
+    console.log(` - Dropped (swiped/cooldown): ${swipedOrRecycledFiltered}`);
+    console.log(` - Dropped (gender preference): ${genderFiltered}`);
+    console.log(` - Dropped (age range): ${ageFiltered}`);
+    console.log(` - Final matching candidates added to pool: ${pool.length}`);
   }
 
   // Deduplicate and rank candidates simply
