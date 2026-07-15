@@ -201,10 +201,17 @@ export default function SettingsScreen({ navigation }) {
               thumbColor={Colors.white}
             />
           </View>
-          <TouchableOpacity style={[styles.settingItem, { borderBottomWidth: 0 }]} onPress={handleBlockList}>
+          <TouchableOpacity style={styles.settingItem} onPress={handleBlockList}>
             <View style={styles.itemLeft}>
               <Ionicons name="shield-checkmark-outline" size={20} color={Colors.text} style={styles.itemIcon} />
               <Text style={styles.itemLabel}>Blocked Contacts</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.settingItem, { borderBottomWidth: 0 }]} onPress={() => navigation.navigate('Support')}>
+            <View style={styles.itemLeft}>
+              <Ionicons name="help-circle-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+              <Text style={styles.itemLabel}>Help & Support</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
           </TouchableOpacity>

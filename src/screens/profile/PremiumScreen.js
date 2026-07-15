@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, Linking, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -54,12 +54,44 @@ export default function PremiumScreen({ navigation }) {
           return;
         }
       }
-      alert('Could not process your upgrade at this time. Please try again.');
+      Alert.alert('Upgrade Failed', 'Could not process your upgrade at this time. Please try again.');
     } catch (e) {
-      alert('Transaction cancelled or failed: ' + e.message);
+      Alert.alert('Transaction Failed', 'Transaction cancelled or failed: ' + e.message);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleRestore = async () => {
+    setIsProcessing(true);
+    try {
+      const customerInfo = await Purchases.restorePurchases();
+      const isGoldActive = customerInfo?.entitlements?.active?.['gold']?.isActive;
+      if (isGoldActive) {
+        const success = await upgradeToPremium(user?.uid);
+        if (success) {
+          if (profile) setProfile({ ...profile, isPremium: true });
+          Alert.alert('Success', 'Purchases restored successfully!');
+          navigation.goBack();
+          return;
+        }
+      }
+      Alert.alert('No Subscription Found', 'We could not find an active subscription to restore.');
+    } catch (e) {
+      Alert.alert('Restore Failed', e.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleManageSubscription = () => {
+    const url = Platform.OS === 'ios'
+      ? 'https://apps.apple.com/account/subscriptions'
+      : 'https://play.google.com/store/account/subscriptions';
+    Linking.openURL(url).catch(err => {
+      console.warn("Could not open subscription url:", err);
+      Alert.alert('Error', 'Unable to open billing management.');
+    });
   };
 
   return (
@@ -163,6 +195,17 @@ export default function PremiumScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.maybeLaterBtn}>
           <Text style={styles.maybeLater}>Maybe later</Text>
         </TouchableOpacity>
+
+        {/* Restore and Manage Subscription */}
+        <View style={styles.legalLinksRow}>
+          <TouchableOpacity onPress={handleRestore} disabled={isProcessing}>
+            <Text style={styles.legalLink}>Restore Purchases</Text>
+          </TouchableOpacity>
+          <Text style={styles.legalDivider}>•</Text>
+          <TouchableOpacity onPress={handleManageSubscription}>
+            <Text style={styles.legalLink}>Manage Subscription</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -215,28 +258,31 @@ const styles = StyleSheet.create({
   comparisonContainer: { marginTop: Spacing.md, marginBottom: Spacing.md },
   comparisonTable: { borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.lg, overflow: 'hidden', backgroundColor: Colors.surface },
   comparisonRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: Colors.border },
-  comparisonRowAlt: { backgroundColor: 'rgba(0,0,0,0.02)' },
+  comparisonRowAlt: { backgroundColor: 'rgba(18, 32, 46, 0.02)' },
   comparisonRowLast: { borderBottomWidth: 0 },
-  comparisonHeader: { backgroundColor: '#1C1A2E', borderBottomWidth: 2, borderColor: Colors.border },
+  comparisonHeader: { backgroundColor: '#12202E', borderBottomWidth: 2, borderColor: Colors.border },
   comparisonCell: { paddingVertical: Spacing.md, paddingHorizontal: Spacing.xs, fontSize: 12, textAlign: 'center' },
   comparisonColName: { flex: 1.3, textAlign: 'left', paddingLeft: Spacing.md },
   comparisonColFree: { flex: 0.8, color: Colors.textMuted },
-  comparisonColGold: { flex: 1.0, fontWeight: '700', backgroundColor: '#FF3A5C08' },
+  comparisonColGold: { flex: 1.0, fontWeight: '700', backgroundColor: 'rgba(198, 96, 46, 0.04)' },
   headerText: { fontWeight: '700', color: Colors.white, fontSize: 12 },
-  goldHeaderText: { color: '#FFD700' },
+  goldHeaderText: { color: Colors.primary },
   cellText: { color: Colors.text },
   crossText: { color: Colors.textMuted },
-  tickText: { color: '#FF3A5C', fontWeight: '700' },
-
+  tickText: { color: Colors.primary, fontWeight: '700' },
+ 
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingHorizontal: Spacing['2xl'], paddingTop: Spacing.md,
     backgroundColor: Colors.background,
     borderTopWidth: 1, borderTopColor: Colors.border,
   },
-  purchaseButton: { width: '100%', borderRadius: Radius.full, overflow: 'hidden', ...Shadow.md },
+  purchaseButton: { width: '100%', borderRadius: Radius['2xl'], overflow: 'hidden', ...Shadow.md },
   purchaseGradient: { paddingVertical: Spacing.md, alignItems: 'center' },
   purchaseButtonText: { color: Colors.white, fontWeight: '800', fontSize: 18 },
-  maybeLaterBtn: { paddingVertical: Spacing.sm, alignItems: 'center' },
+  maybeLaterBtn: { paddingVertical: 4, alignItems: 'center' },
   maybeLater: { color: Colors.textMuted, fontSize: 14 },
+  legalLinksRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 4, gap: 8, paddingBottom: 6 },
+  legalLink: { fontSize: 11, color: Colors.textMuted, fontWeight: '600', textDecorationLine: 'underline' },
+  legalDivider: { fontSize: 11, color: Colors.textMuted },
 });

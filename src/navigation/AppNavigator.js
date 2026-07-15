@@ -23,6 +23,7 @@ import ManagePromptsScreen from '../screens/profile/ManagePromptsScreen';
 import PhotoVerificationScreen from '../screens/profile/PhotoVerificationScreen';
 import AnalyticsScreen from '../screens/profile/AnalyticsScreen';
 import BlockedContactsScreen from '../screens/profile/BlockedContactsScreen';
+import SupportScreen from '../screens/profile/SupportScreen';
 
 import ChatScreen from '../screens/chat/ChatScreen';
 import NewMatchCarouselScreen from '../screens/chat/NewMatchCarouselScreen';
@@ -222,6 +223,7 @@ export default function AppNavigator() {
               <RootStack.Screen name="PhotoVerification" component={PhotoVerificationScreen} options={{ presentation: 'modal' }} />
               <RootStack.Screen name="Analytics" component={AnalyticsScreen} />
               <RootStack.Screen name="BlockedContacts" component={BlockedContactsScreen} />
+              <RootStack.Screen name="Support" component={SupportScreen} />
 
               {/* Chat Stack screens */}
               <RootStack.Screen name="Chat" component={ChatScreen} />
