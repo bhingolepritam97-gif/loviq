@@ -99,14 +99,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
+    borderRadius: Radius['2xl'],
     borderWidth: 1.5,
     borderColor: Colors.border,
     paddingHorizontal: Spacing.base,
     height: 56,
   },
   focused: {
-    borderColor: Colors.primary,
+    borderColor: Colors.borderFocus,
   },
   errorBorder: {
     borderColor: Colors.error,

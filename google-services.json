@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "627555697682",
+    "firebase_url": "https://loviq-33ac0-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "loviq-33ac0",
     "storage_bucket": "loviq-33ac0.firebasestorage.app"
   },
@@ -13,6 +14,14 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "627555697682-kllje5kd534029ukgj2hbqeobj4da1jo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pritambhingole.vela",
+            "certificate_hash": "0bd836ae6c4c4ba3602d3955fb288d7bb12377fd"
+          }
+        },
         {
           "client_id": "627555697682-eql083v3o9ahcsqso3qeahfb8vfj4g7s.apps.googleusercontent.com",
           "client_type": 3
@@ -29,6 +38,13 @@
             {
               "client_id": "627555697682-eql083v3o9ahcsqso3qeahfb8vfj4g7s.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "627555697682-112h7ck44funs7o09jnm5h0nmn4pqs6u.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.pritambhingole.vela"
+              }
             }
           ]
         }

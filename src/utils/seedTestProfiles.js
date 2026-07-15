@@ -248,23 +248,43 @@ async function insertProfileIntoDatabase(profile) {
 // ─── Cleanup helper ───────────────────────────────────────────────────────────
 
 async function cleanupSeedData() {
-  console.log('\n🗑  Cleanup mode: deleting all isSeedData profiles...');
+  console.log('\n🗑  Cleanup mode: deleting all profiles with "seed_" ID or isSeedData flag...');
   try {
     const profilesRef = collection(db, 'profiles');
-    const q = query(profilesRef, where('isSeedData', '==', true));
-    const snap = await getDocs(q);
+    const snap = await getDocs(profilesRef);
     
     if (snap.empty) {
+      console.log('No profiles found in database.');
+      return;
+    }
+
+    const batchList = [];
+    let currentBatch = writeBatch(db);
+    let opCount = 0;
+
+    snap.forEach(docSnap => {
+      const data = docSnap.data();
+      if (docSnap.id.startsWith('seed_') || data.isSeedData === true) {
+        currentBatch.delete(docSnap.ref);
+        opCount++;
+        if (opCount % 400 === 0) {
+          batchList.push(currentBatch.commit());
+          currentBatch = writeBatch(db);
+        }
+      }
+    });
+
+    if (opCount % 400 !== 0) {
+      batchList.push(currentBatch.commit());
+    }
+
+    if (opCount === 0) {
       console.log('No seed profiles found to delete.');
       return;
     }
 
-    const batch = writeBatch(db);
-    snap.forEach(docSnap => {
-      batch.delete(docSnap.ref);
-    });
-    await batch.commit();
-    console.log(`Deleted ${snap.size} seed profiles.`);
+    await Promise.all(batchList);
+    console.log(`✅  Successfully deleted ${opCount} seed profiles.`);
   } catch (err) {
     console.error('Error during cleanup:', err.message);
   }
@@ -309,7 +329,7 @@ async function main() {
 
   if (isCleanup) {
     await cleanupSeedData();
-    return;
+    process.exit(0);
   }
 
   // ─── Fetch target coordinates dynamically ───────────────────────────────

@@ -14,7 +14,13 @@ const BASE_URL = getBaseUrl();
 
 
 export async function apiClient(endpoint, { method = 'GET', body, ...customConfig } = {}) {
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  let token = '';
+  try {
+    token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  } catch (tokenErr) {
+    console.error('[apiClient] Firebase token retrieval failed:', tokenErr.message);
+    throw new Error('Invalid or expired Firebase token');
+  }
   
   const headers = {
     'Content-Type': 'application/json',
@@ -25,7 +31,7 @@ export async function apiClient(endpoint, { method = 'GET', body, ...customConfi
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), customConfig.timeout || 10000);
+  const timeoutId = setTimeout(() => controller.abort(), customConfig.timeout || 30000);
 
   const config = {
     method,
@@ -41,10 +47,27 @@ export async function apiClient(endpoint, { method = 'GET', body, ...customConfi
   }
 
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, config);
+    let response = await fetch(`${BASE_URL}${endpoint}`, config);
     clearTimeout(timeoutId);
     
-    const data = await response.json();
+    let data = await response.json();
+    
+    // Auto-retry once if token has expired or is invalid
+    if (!response.ok && (data.error === 'Invalid or expired Firebase token' || response.status === 401)) {
+      if (auth.currentUser) {
+        console.log('[apiClient] Token expired or invalid. Force-refreshing Firebase ID token...');
+        const newToken = await auth.currentUser.getIdToken(true);
+        config.headers['Authorization'] = `Bearer ${newToken}`;
+        
+        const retryController = new AbortController();
+        const retryTimeoutId = setTimeout(() => retryController.abort(), customConfig.timeout || 30000);
+        config.signal = retryController.signal;
+        
+        response = await fetch(`${BASE_URL}${endpoint}`, config);
+        clearTimeout(retryTimeoutId);
+        data = await response.json();
+      }
+    }
     
     if (!response.ok) {
       throw new Error(data.error || 'Something went wrong');

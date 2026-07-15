@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, Animated, Image, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Animated, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,10 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { auth } from '../../config/firebase';
-import { Colors, Shadow, Typography, Spacing, Radius } from '../../theme';
+import { Colors, Shadow, Typography, Spacing, Radius, Gradients } from '../../theme';
+import AnimatedLogo from '../../components/brand/AnimatedLogo';
+import HeroCarousel from '../../components/carousel/HeroCarousel';
+import { Brand } from '../../components/brand/brand';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -49,7 +52,8 @@ const CARDS = [
     zIndex: 2, 
     scale: 1.02,
     isNew: true,
-    isVerified: true
+    isVerified: true,
+    hasHeart: false
   },
 ];
 
@@ -57,7 +61,6 @@ export default function WelcomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
-  const floatAnim = useRef(new Animated.Value(0)).current;
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || 'mock-ios-client-id',
@@ -85,19 +88,7 @@ export default function WelcomeScreen({ navigation }) {
       Animated.timing(fadeAnim, { toValue: 1, duration: 800, delay: 100, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 700, delay: 100, useNativeDriver: true }),
     ]).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, { toValue: 1, duration: 2500, useNativeDriver: true }),
-        Animated.timing(floatAnim, { toValue: 0, duration: 2500, useNativeDriver: true }),
-      ])
-    ).start();
   }, []);
-
-  const floatY = floatAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -6],
-  });
 
   const [socialLoading, setSocialLoading] = useState(false);
 
@@ -143,79 +134,20 @@ export default function WelcomeScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#FFF8F8', '#FFFFFF', '#FFFFFF']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[Colors.background, Colors.background]} style={StyleSheet.absoluteFill} />
 
       <ScrollView 
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + Spacing.sm, paddingBottom: insets.bottom + Spacing.lg }]} 
         showsVerticalScrollIndicator={false}
       >
         {/* Card stack area */}
-        <Animated.View style={[styles.cardsArea, { transform: [{ translateY: floatY }] }]}>
-          {CARDS.map((card) => {
-            const cardStyle = card.alignSelf 
-              ? { alignSelf: 'center', top: card.top, zIndex: card.zIndex }
-              : { top: card.top, left: card.left, right: card.right, zIndex: card.zIndex };
-              
-            return (
-              <Animated.View
-                key={card.id}
-                style={[
-                  styles.floatingCard, 
-                  cardStyle,
-                  { 
-                    transform: [
-                      { rotate: card.rotate },
-                      { scale: card.scale }
-                    ], 
-                    opacity: fadeAnim 
-                  }
-                ]}
-              >
-                <Image source={{ uri: card.photo }} style={styles.cardImage} />
-                
-                {card.isNew && (
-                  <View style={styles.newBadge}>
-                    <Text style={styles.newBadgeText}>✨ New here</Text>
-                  </View>
-                )}
-
-                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={styles.cardScrim}>
-                  <View style={styles.cardInfoRow}>
-                    <Text style={styles.cardName} numberOfLines={1}>
-                      {card.name}
-                    </Text>
-                    {card.isVerified && (
-                      <Ionicons name="checkmark-circle" size={16} color="#FF3A5C" style={styles.verifiedIcon} />
-                    )}
-                  </View>
-                  <Text style={styles.cardTitle}>{card.title}</Text>
-                </LinearGradient>
-
-                {card.hasHeart && (
-                  <View style={[styles.cardHeartCircle, card.left ? { left: -10 } : { right: -10 }]}>
-                    <Ionicons name="heart" size={14} color="#FF3A5C" />
-                  </View>
-                )}
-              </Animated.View>
-            );
-          })}
+        <Animated.View style={[styles.cardsArea, { opacity: fadeAnim }]}>
+          <HeroCarousel cards={CARDS} autoplay={true} interval={5000} animationDuration={700} />
         </Animated.View>
-
-        {/* Dots indicator */}
-        <View style={styles.pagination}>
-          <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-        </View>
 
         {/* Logo Section */}
         <Animated.View style={[styles.logoSection, { opacity: fadeAnim }]}>
-          <Image
-            source={require('../../../assets/logo.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
+          <AnimatedLogo type="logo" animation="float" size="lg" variant="dark" duration={3500} />
         </Animated.View>
 
         {/* Heading Section */}
@@ -236,9 +168,9 @@ export default function WelcomeScreen({ navigation }) {
               onPress={() => navigation.navigate('PhoneEmail', { isLogin: false })}
             >
               <LinearGradient
-                colors={['#FF1E76', '#FF6B35']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+                colors={Gradients.primary.colors}
+                start={Gradients.primary.start}
+                end={Gradients.primary.end}
                 style={styles.getStartedGradient}
               >
                 <Text style={styles.getStartedText}>Get started</Text>
@@ -296,84 +228,56 @@ export default function WelcomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: Colors.background },
   scroll: { flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: Spacing.xl },
   
   // Card stack styles
-  cardsArea: { height: 250, position: 'relative', width: '100%', marginTop: Spacing.md },
-  floatingCard: {
-    position: 'absolute',
-    width: width * 0.40,
-    height: 195,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 15,
-    elevation: 6,
-    backgroundColor: '#FFFFFF',
-  },
-  cardImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  cardScrim: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: Spacing.md, height: '60%', justifyContent: 'flex-end' },
-  cardInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cardName: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
-  cardTitle: { color: 'rgba(255,255,255,0.8)', fontSize: 10, marginTop: 2 },
-  verifiedIcon: { marginTop: 1 },
-  newBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 4, borderRadius: Radius.sm },
-  newBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '700' },
-  cardHeartCircle: { position: 'absolute', top: '45%', width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', ...Shadow.sm, zIndex: 10 },
-
-  // Pagination indicator
-  pagination: { flexDirection: 'row', alignSelf: 'center', gap: 6, marginVertical: Spacing.sm },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#E0E0E0' },
-  dotActive: { backgroundColor: '#FF3A5C', width: 14 },
-
+  cardsArea: { height: 260, position: 'relative', width: '100%', marginTop: Spacing.md },
+  
   // Logo styles
   logoSection: { alignItems: 'center', marginVertical: Spacing.xs },
-  logoImage: { width: 100, height: 50 },
 
   // Content styles
   contentSection: { alignItems: 'center', width: '100%' },
   headline: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#0D0D26',
+    color: Colors.text,
     textAlign: 'center',
     letterSpacing: -0.8,
     lineHeight: 38,
     marginBottom: Spacing.sm,
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
-  headlineAccent: { color: '#FF3A5C', textDecorationLine: 'underline' },
+  headlineAccent: { color: Colors.primary, textDecorationLine: 'none', fontStyle: 'italic' },
   subtext: {
     fontSize: 14,
-    color: '#7B7B8F',
+    color: Colors.textMuted,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: Spacing.xl,
   },
-  subtextAccent: { color: '#FF1E76', fontWeight: '700' },
+  subtextAccent: { color: Colors.secondary, fontWeight: '700' },
 
   // Action Buttons
   buttonGroup: { width: '100%', gap: Spacing.md, alignItems: 'center' },
-  getStartedBtn: { width: '100%', borderRadius: Radius.full, overflow: 'hidden', ...Shadow.md },
+  getStartedBtn: { width: '100%', borderRadius: Radius['2xl'], overflow: 'hidden', ...Shadow.md },
   getStartedGradient: { flexDirection: 'row', height: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xl },
   getStartedText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
   arrowIcon: { marginLeft: Spacing.xs },
 
   // Divider
   dividerRow: { flexDirection: 'row', alignItems: 'center', width: '100%', marginVertical: Spacing.xs, gap: 10 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#F0F0F5' },
-  dividerText: { color: '#BDBDCF', fontSize: 11, fontWeight: '700' },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  dividerText: { color: Colors.textMuted, fontSize: 11, fontWeight: '700' },
 
   // Social Row
   socialRow: { flexDirection: 'row', width: '100%', gap: Spacing.sm, justifyContent: 'space-between' },
-  socialBtn: { flex: 1, flexDirection: 'row', height: 44, borderWidth: 1, borderColor: '#E5E5EA', borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFFFFF' },
-  socialBtnText: { fontSize: 13, color: '#1A1A2E', fontWeight: '600' },
+  socialBtn: { flex: 1, flexDirection: 'row', height: 44, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius['2xl'], alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.surface },
+  socialBtnText: { fontSize: 13, color: Colors.text, fontWeight: '600' },
 
   // Footer
   loginContainer: { paddingVertical: Spacing.sm, marginTop: Spacing.xs },
-  loginText: { fontSize: 13, color: '#8A8A9A' },
-  loginLink: { color: '#FF3A5C', fontWeight: '700' },
+  loginText: { fontSize: 13, color: Colors.textMuted },
+  loginLink: { color: Colors.primary, fontWeight: '700' },
 });

@@ -7,6 +7,8 @@ import { Colors, Shadow, Typography, Spacing, Radius } from '../../theme';
 import Input from '../../components/Input';
 import { auth } from '../../config/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import BrandIcon from '../../components/brand/BrandIcon';
+import { Brand } from '../../components/brand/brand';
 
 export default function PasswordScreen({ route, navigation }) {
   const { email, isLogin } = route.params || {};
@@ -68,22 +70,25 @@ export default function PasswordScreen({ route, navigation }) {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <LinearGradient colors={['#FFF8F8', '#FFFFFF', '#FFFFFF']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[Colors.background, Colors.background]} style={StyleSheet.absoluteFill} />
       
       <ScrollView 
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + Spacing.sm, paddingBottom: insets.bottom + Spacing.lg }]} 
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text} />
-        </TouchableOpacity>
-
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <BrandIcon size="sm" variant="dark" />
+        </View>
+ 
         <Text style={styles.title}>{isLogin ? 'Enter your password' : 'Choose a password'}</Text>
         <Text style={styles.subtitle}>
           {isLogin ? `Logging in as ${email}` : `Create a password for ${email}`}
         </Text>
-
+ 
         <View style={styles.inputContainer}>
           <Input
             placeholder="Password"
@@ -110,14 +115,14 @@ export default function PasswordScreen({ route, navigation }) {
             </TouchableOpacity>
           )}
         </View>
-
+ 
         <TouchableOpacity 
           style={[styles.continueButton, password.length < 6 && styles.continueButtonDisabled]}
           disabled={password.length < 6 || loading}
           onPress={handleContinue}
         >
           <LinearGradient
-            colors={password.length < 6 ? ['#ccc', '#ccc'] : Colors.gradientColors}
+            colors={password.length < 6 ? [Colors.border, Colors.border] : Colors.gradientColors}
             start={Colors.gradientAngle.start}
             end={Colors.gradientAngle.end}
             style={styles.btnGradient}
@@ -133,16 +138,17 @@ export default function PasswordScreen({ route, navigation }) {
     </KeyboardAvoidingView>
   );
 }
-
+ 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: Colors.background },
   scroll: { flexGrow: 1, paddingHorizontal: 24 },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
   title: { fontSize: 28, fontWeight: '800', color: Colors.text, marginBottom: 8, letterSpacing: -0.5 },
   subtitle: { fontSize: 15, color: Colors.textMuted, marginBottom: 24, lineHeight: 22 },
   inputContainer: { width: '100%', marginBottom: 24 },
   errorText: { color: Colors.error, fontSize: 13, marginTop: 8, fontWeight: '600' },
-  continueButton: { borderRadius: Radius.full, overflow: 'hidden', ...Shadow.md, marginTop: 'auto' },
+  continueButton: { borderRadius: Radius['2xl'], overflow: 'hidden', ...Shadow.md, marginTop: 'auto' },
   continueButtonDisabled: { shadowOpacity: 0, elevation: 0 },
   btnGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
   continueButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },

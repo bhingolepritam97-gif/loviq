@@ -6,6 +6,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { subscribeToMatches } from '../../services/ChatService';
 import { Ionicons } from '@expo/vector-icons';
+import BrandIcon from '../../components/brand/BrandIcon';
+import BrandLogo from '../../components/brand/BrandLogo';
+import { Brand } from '../../components/brand/brand';
 
 export default function MatchesInboxScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -104,18 +107,18 @@ export default function MatchesInboxScreen({ navigation }) {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.userAvatarWrap}>
-            {profile?.photos?.[0] ? (
-              <Image source={{ uri: profile.photos[0] }} style={styles.userAvatar} />
-            ) : (
-              <View style={[styles.userAvatar, { backgroundColor: Colors.border }]} />
-            )}
-          </TouchableOpacity>
-          <Text style={styles.title}>Matches</Text>
-        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.userAvatarWrap}>
+          {profile?.photos?.[0] ? (
+            <Image source={{ uri: profile.photos[0] }} style={styles.userAvatar} />
+          ) : (
+            <View style={[styles.userAvatar, { backgroundColor: Colors.border }]} />
+          )}
+        </TouchableOpacity>
+        
+        <BrandIcon size="md" />
+
         <TouchableOpacity style={styles.iconButton}>
-          <Text style={styles.icon}>⚙️</Text>
+          <Ionicons name="options" size={20} color={Colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -209,7 +212,7 @@ export default function MatchesInboxScreen({ navigation }) {
               </View>
             ) : (
               <View style={styles.emptySearchContainer}>
-                <Ionicons name="chatbubbles-outline" size={64} color={Colors.border} />
+                <BrandLogo size="lg" style={{ opacity: 0.15, marginBottom: Spacing.xl }} />
                 <Text style={styles.emptySearchTitle}>It's quiet here...</Text>
                 <Text style={styles.emptySearchSubtitle}>Keep swiping! When you match with someone, they'll appear here.</Text>
                 <TouchableOpacity 
@@ -236,21 +239,18 @@ export default function MatchesInboxScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, height: 60, borderBottomWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, height: 60, borderBottomWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background },
   userAvatarWrap: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', borderWidth: 1.5, borderColor: Colors.primary + '30', ...Shadow.sm },
   userAvatar: { width: '100%', height: '100%', resizeMode: 'cover' },
-  title: { fontSize: Typography.fontSize.xl, fontWeight: '800', color: Colors.text, letterSpacing: -0.5 },
   iconButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  icon: { fontSize: 16 },
-
-  searchSection: { paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm, backgroundColor: Colors.surface, borderBottomWidth: 1, borderColor: Colors.border },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: Radius.lg, paddingHorizontal: Spacing.md, height: 40, borderWidth: 1, borderColor: Colors.border },
+ 
+  searchSection: { paddingHorizontal: Spacing.xl, paddingVertical: Spacing.sm, backgroundColor: Colors.background, borderBottomWidth: 1, borderColor: Colors.border },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius['2xl'], paddingHorizontal: Spacing.md, height: 40, borderWidth: 1, borderColor: Colors.border },
   searchIcon: { fontSize: 14, marginRight: Spacing.xs, color: Colors.textMuted },
   searchInput: { flex: 1, fontSize: 14, color: Colors.text, paddingVertical: 0 },
   clearSearchBtn: { padding: Spacing.xs },
   clearSearchText: { fontSize: 12, color: Colors.textMuted, fontWeight: '700' },
-
+ 
   newMatchesSection: { marginVertical: Spacing.md },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, marginBottom: Spacing.md },
   sectionTitle: { fontSize: 14, fontWeight: '800', color: Colors.textMuted, letterSpacing: 1.0, textTransform: 'uppercase' },
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   matchAvatar: { width: '100%', height: '100%', resizeMode: 'cover' },
   onlineBadge: { position: 'absolute', bottom: 20, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: Colors.success, borderWidth: 2.5, borderColor: Colors.surface },
   matchName: { fontSize: 12, fontWeight: '700', color: Colors.text, marginTop: Spacing.sm },
-
+ 
   listScroll: { paddingBottom: 100 },
   chatRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.lg, borderBottomWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   unreadChatRow: { backgroundColor: Colors.primary + '04' },
@@ -277,12 +277,12 @@ const styles = StyleSheet.create({
   chatPreview: { fontSize: 14, color: Colors.textMuted, lineHeight: 18 },
   unreadPreview: { color: Colors.text, fontWeight: '700' },
   unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary, marginLeft: Spacing.md },
-
+ 
   emptySearchContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing['2xl'], paddingTop: 80 },
   emptySearchEmoji: { fontSize: 48, marginBottom: Spacing.md },
   emptySearchTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: Spacing.sm },
   emptySearchSubtitle: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', lineHeight: 20 },
-  exploreBtn: { marginTop: Spacing.xl, borderRadius: Radius.full, overflow: 'hidden', ...Shadow.sm },
+  exploreBtn: { marginTop: Spacing.xl, borderRadius: Radius['2xl'], overflow: 'hidden', ...Shadow.sm },
   exploreGradient: { paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md },
   exploreBtnText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
 });

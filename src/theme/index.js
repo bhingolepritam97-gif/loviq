@@ -1,28 +1,28 @@
 // ─────────────────────────────────────────────
-// Vela Design System
-// Brand gradient: Magenta #E91E8C → Coral #FF6B35
+// Vela Design System — Midnight Sail
+// Brand palette: Ink #12202E · Accent #C6602E
 // ─────────────────────────────────────────────
 
 export const Colors = {
   // Brand
-  primary: '#E91E8C',
-  secondary: '#FF6B35',
-  gradientStart: '#E91E8C',
-  gradientEnd: '#FF6B35',
-  gradientColors: ['#E91E8C', '#FF6B35'],
+  primary: '#C6602E',
+  secondary: '#12202E',
+  gradientStart: '#C6602E',
+  gradientEnd: '#12202E',
+  gradientColors: ['#C6602E', '#12202E'],
   gradientAngle: { start: { x: 0, y: 0 }, end: { x: 1, y: 0 } },
 
   // Surfaces
-  background: '#FAFAFA',
+  background: '#F4EEE1',
   surface: '#FFFFFF',
   surfaceElevated: '#FFFFFF',
-  border: '#F0F0F5',
-  borderFocus: '#E91E8C',
+  border: '#E5DFD3',
+  borderFocus: '#C6602E',
 
   // Text
-  text: '#1A1A2E',
-  textMuted: '#8A8A9A',
-  textLight: '#BDBDCF',
+  text: '#12202E',
+  textMuted: '#8A8378',
+  textLight: '#B8B0A4',
   textWhite: '#FFFFFF',
   textOnGradient: '#FFFFFF',
 
@@ -35,25 +35,25 @@ export const Colors = {
   warningLight: '#FFF8E6',
   superLike: '#00B4D8',
   superLikeLight: '#E0F7FA',
-  gold: '#F9A825',
+  gold: '#C6602E',
 
   // Action buttons (swipe)
   likeGreen: '#00C48C',
   passRed: '#FF4757',
   superBlue: '#00B4D8',
-  rewindGold: '#F9A825',
-  boostPurple: '#9C27B0',
+  rewindGold: '#C6602E',
+  boostPurple: '#C6602E',
 
   // Chat
-  bubbleSent: '#E91E8C',
-  bubbleReceived: '#F5F5F5',
+  bubbleSent: '#C6602E',
+  bubbleReceived: '#E5DFD3',
   bubbleSentText: '#FFFFFF',
-  bubbleReceivedText: '#1A1A2E',
+  bubbleReceivedText: '#12202E',
 
   // Overlay
-  overlay: 'rgba(0,0,0,0.5)',
-  overlayLight: 'rgba(0,0,0,0.25)',
-  overlayHeavy: 'rgba(0,0,0,0.75)',
+  overlay: 'rgba(18,32,46,0.5)',
+  overlayLight: 'rgba(18,32,46,0.25)',
+  overlayHeavy: 'rgba(18,32,46,0.75)',
 
   // Transparent
   transparent: 'transparent',
@@ -129,28 +129,28 @@ export const Radius = {
 
 export const Shadow = {
   sm: {
-    shadowColor: '#000',
+    shadowColor: '#12202E',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
   md: {
-    shadowColor: '#000',
+    shadowColor: '#12202E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
   },
   lg: {
-    shadowColor: '#000',
+    shadowColor: '#12202E',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 24,
     elevation: 8,
   },
   primary: {
-    shadowColor: '#E91E8C',
+    shadowColor: '#C6602E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -161,17 +161,17 @@ export const Shadow = {
 // Gradient presets
 export const Gradients = {
   primary: {
-    colors: ['#E91E8C', '#FF6B35'],
+    colors: ['#C6602E', '#A04D24'],
     start: { x: 0, y: 0 },
     end: { x: 1, y: 0 },
   },
   primaryVertical: {
-    colors: ['#E91E8C', '#FF6B35'],
+    colors: ['#C6602E', '#A04D24'],
     start: { x: 0, y: 0 },
     end: { x: 0, y: 1 },
   },
   dark: {
-    colors: ['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)'],
+    colors: ['rgba(18,32,46,0)', 'rgba(18,32,46,0.85)'],
     start: { x: 0, y: 0 },
     end: { x: 0, y: 1 },
   },
@@ -181,12 +181,12 @@ export const Gradients = {
     end: { x: 1, y: 0 },
   },
   gold: {
-    colors: ['#F9A825', '#FF8F00'],
+    colors: ['#C6602E', '#A04D24'],
     start: { x: 0, y: 0 },
     end: { x: 1, y: 0 },
   },
   premium: {
-    colors: ['#9C27B0', '#E91E8C', '#FF6B35'],
+    colors: ['#12202E', '#C6602E', '#A04D24'],
     start: { x: 0, y: 0 },
     end: { x: 1, y: 1 },
   },

@@ -37,7 +37,7 @@ export default function Button({
 
   const containerStyle = [
     styles.base,
-    { height: heights[size], borderRadius: heights[size] / 2 },
+    { height: heights[size], borderRadius: Radius['2xl'] },
     style,
   ];
 
@@ -80,7 +80,7 @@ export default function Button({
           colors={Gradients.primary.colors}
           start={Gradients.primary.start}
           end={Gradients.primary.end}
-          style={[StyleSheet.absoluteFill, { borderRadius: heights[size] / 2 }]}
+          style={[StyleSheet.absoluteFill, { borderRadius: Radius['2xl'] }]}
         />
         {content}
       </TouchableOpacity>

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { trackOnboardingStep, trackOnboardingStepCompleted } from '../../utils/onboardingAnalytics';
 import ProgressBar from '../../components/ProgressBar';
+import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const INTERESTED_IN = ['Men', 'Women', 'Everyone'];
 const INTENTS = [
@@ -70,37 +72,45 @@ export default function PreferencesScreen({ navigation, route }) {
         style={[styles.continueButton, !isValid && styles.continueButtonDisabled]}
         disabled={!isValid}
         onPress={handleContinue}
+        activeOpacity={isValid ? 0.85 : 1}
       >
-        <Text style={styles.continueButtonText}>Continue</Text>
+        <LinearGradient
+          colors={isValid ? Gradients.primary.colors : [Colors.border, Colors.border]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.continueGradient}
+        >
+          <Text style={styles.continueButtonText}>Continue</Text>
+        </LinearGradient>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, paddingTop: 60, backgroundColor: '#fff' },
-  title: { fontSize: 28, fontWeight: '700', marginBottom: 24, marginTop: 16 },
-  label: { fontSize: 14, color: '#666', marginBottom: 8, marginTop: 8 },
+  container: { flex: 1, padding: Spacing.xl, paddingTop: 60, backgroundColor: Colors.background },
+  title: { fontSize: 28, fontWeight: '800', color: Colors.text, marginBottom: 24, marginTop: 16 },
+  label: { fontSize: 14, color: Colors.textMuted, marginBottom: 8, marginTop: 8, fontWeight: '600' },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
   pill: {
-    paddingVertical: 10, paddingHorizontal: 18, borderRadius: 24,
-    borderWidth: 1, borderColor: '#e0e0e0',
+    paddingVertical: 10, paddingHorizontal: 18, borderRadius: Radius.full,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface,
   },
-  pillSelected: { backgroundColor: '#FF4667', borderColor: '#FF4667' },
-  pillText: { color: '#333', fontSize: 14 },
-  pillTextSelected: { color: '#fff', fontWeight: '600' },
+  pillSelected: { backgroundColor: Colors.primary + '15', borderColor: Colors.primary },
+  pillText: { color: Colors.text, fontSize: 14, fontWeight: '600' },
+  pillTextSelected: { color: Colors.primary, fontWeight: '700' },
   cardColumn: { gap: 10, marginBottom: 8 },
   card: {
-    borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 14, padding: 16,
+    borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg, padding: 16, backgroundColor: Colors.surface,
   },
-  cardSelected: { borderColor: '#FF4667', backgroundColor: '#FFF1F3' },
-  cardText: { fontSize: 15, color: '#333' },
-  cardTextSelected: { color: '#FF4667', fontWeight: '600' },
-  hint: { fontSize: 12, color: '#999', marginBottom: 24 },
+  cardSelected: { borderColor: Colors.primary, backgroundColor: Colors.primary + '0B' },
+  cardText: { fontSize: 15, color: Colors.text, fontWeight: '500' },
+  cardTextSelected: { color: Colors.primary, fontWeight: '700' },
+  hint: { fontSize: 12, color: Colors.textMuted, marginBottom: 24 },
   continueButton: {
-    backgroundColor: '#FF4667', borderRadius: 28, padding: 18,
-    alignItems: 'center', marginTop: 'auto',
+    borderRadius: Radius['2xl'], overflow: 'hidden', ...Shadow.md, marginTop: 'auto',
   },
-  continueButtonDisabled: { backgroundColor: '#ccc' },
-  continueButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  continueButtonDisabled: { shadowOpacity: 0, elevation: 0 },
+  continueGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  continueButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
 });

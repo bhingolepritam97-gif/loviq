@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, Radius, Gradients, Typography } from '../../theme';
 import { expandRadiusBy, getRecycledPasses } from '../../utils/profileFeedLogic';
+import LogoLoader from '../../components/brand/LogoLoader';
+import AnimatedLogo from '../../components/brand/AnimatedLogo';
 
 /**
  * EmptyStateScreen.js
@@ -114,7 +116,7 @@ export default function EmptyStateScreen({ navigation, route, inline = false }) 
   if (phase === 'loading') {
     return (
       <View style={[styles.container, { paddingTop }]}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <LogoLoader visible={true} inline={true} />
         <Text style={styles.loadingText}>Searching nearby...</Text>
       </View>
     );
@@ -129,7 +131,9 @@ export default function EmptyStateScreen({ navigation, route, inline = false }) 
           { paddingTop, opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
         ]}
       >
-        <Text style={styles.emoji}>🔄</Text>
+        <View style={styles.iconWrapper}>
+          <AnimatedLogo type="icon" animation="pulse" size="lg" />
+        </View>
 
         <Text style={styles.title}>Give skipped profiles a second chance?</Text>
 
@@ -185,7 +189,9 @@ export default function EmptyStateScreen({ navigation, route, inline = false }) 
         { paddingTop, opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
       ]}
     >
-      <Text style={styles.emoji}>🗺️</Text>
+      <View style={styles.iconWrapper}>
+        <AnimatedLogo type="icon" animation="pulse" size="lg" />
+      </View>
 
       <Text style={styles.title}>Out of nearby suggestions</Text>
 
@@ -250,7 +256,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Shared content
-  emoji: { fontSize: 72, marginBottom: Spacing.lg },
+  iconWrapper: { marginBottom: Spacing.xl, opacity: 0.8 },
   title: {
     fontSize: 26,
     fontWeight: '800',
@@ -270,7 +276,7 @@ const styles = StyleSheet.create({
   // ── Buttons
   primaryButton: {
     width: '100%',
-    borderRadius: Radius.full,
+    borderRadius: Radius['2xl'],
     overflow: 'hidden',
     marginBottom: Spacing.md,
   },
@@ -280,7 +286,7 @@ const styles = StyleSheet.create({
   outlineButton: {
     width: '100%',
     paddingVertical: Spacing.md,
-    borderRadius: Radius.full,
+    borderRadius: Radius['2xl'],
     borderWidth: 1.5,
     borderColor: Colors.border,
     backgroundColor: Colors.surface,

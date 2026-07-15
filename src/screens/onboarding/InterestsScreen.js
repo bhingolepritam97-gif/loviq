@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { trackOnboardingStep, trackOnboardingStepCompleted } from '../../utils/onboardingAnalytics';
 import ProgressBar from '../../components/ProgressBar';
+import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const INTEREST_OPTIONS = [
   'Travel', 'Fitness', 'Music', 'Foodie', 'Movies', 'Reading',
@@ -51,14 +53,15 @@ export default function InterestsScreen({ navigation, route }) {
       {/* Search Input */}
       <TextInput
         style={styles.searchInput}
-        placeholder="🔍 Search interests..."
-        placeholderTextColor="#999"
+        placeholder="Search interests..."
+        placeholderTextColor={Colors.textMuted}
         value={searchQuery}
         onChangeText={setSearchQuery}
         clearButtonMode="while-editing"
+        selectionColor={Colors.primary}
       />
 
-      <ScrollView contentContainerStyle={styles.pillWrap}>
+      <ScrollView contentContainerStyle={styles.pillWrap} showsVerticalScrollIndicator={false}>
         {filteredOptions.length > 0 ? (
           filteredOptions.map((interest) => {
             const isSelected = selected.includes(interest);
@@ -83,49 +86,57 @@ export default function InterestsScreen({ navigation, route }) {
         style={[styles.continueButton, !isValid && styles.continueButtonDisabled]}
         disabled={!isValid}
         onPress={handleContinue}
+        activeOpacity={isValid ? 0.85 : 1}
       >
-        <Text style={styles.continueButtonText}>
-          Continue {selected.length > 0 && `(${selected.length} selected)`}
-        </Text>
+        <LinearGradient
+          colors={isValid ? Gradients.primary.colors : [Colors.border, Colors.border]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.continueGradient}
+        >
+          <Text style={styles.continueButtonText}>
+            Continue {selected.length > 0 && `(${selected.length})`}
+          </Text>
+        </LinearGradient>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, paddingTop: 60, backgroundColor: '#fff' },
-  title: { fontSize: 28, fontWeight: '700', marginBottom: 4, marginTop: 16 },
-  subtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
+  container: { flex: 1, padding: Spacing.xl, paddingTop: 60, backgroundColor: Colors.background },
+  title: { fontSize: 28, fontWeight: '800', color: Colors.text, marginBottom: 4, marginTop: 16 },
+  subtitle: { fontSize: 14, color: Colors.textMuted, marginBottom: 20 },
   searchInput: {
     height: 48,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 24,
+    borderColor: Colors.border,
+    borderRadius: Radius['2xl'],
     paddingHorizontal: 16,
     fontSize: 15,
-    color: '#333',
+    color: Colors.text,
     marginBottom: 20,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: Colors.surface,
   },
   pillWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 16 },
   pill: {
-    paddingVertical: 10, paddingHorizontal: 16, borderRadius: 24,
-    borderWidth: 1, borderColor: '#e0e0e0',
+    paddingVertical: 10, paddingHorizontal: 16, borderRadius: Radius.full,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface,
   },
-  pillSelected: { backgroundColor: '#FF4667', borderColor: '#FF4667' },
-  pillText: { color: '#333', fontSize: 14 },
-  pillTextSelected: { color: '#fff', fontWeight: '600' },
+  pillSelected: { backgroundColor: Colors.primary + '15', borderColor: Colors.primary },
+  pillText: { color: Colors.text, fontSize: 14, fontWeight: '600' },
+  pillTextSelected: { color: Colors.primary, fontWeight: '700' },
   noResultsText: {
-    color: '#999',
+    color: Colors.textMuted,
     fontSize: 14,
     textAlign: 'center',
     width: '100%',
     marginVertical: 40,
   },
   continueButton: {
-    backgroundColor: '#FF4667', borderRadius: 28, padding: 18,
-    alignItems: 'center', marginTop: 12,
+    borderRadius: Radius['2xl'], overflow: 'hidden', ...Shadow.md, marginTop: 12,
   },
-  continueButtonDisabled: { backgroundColor: '#ccc' },
-  continueButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  continueButtonDisabled: { shadowOpacity: 0, elevation: 0 },
+  continueGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  continueButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
 });

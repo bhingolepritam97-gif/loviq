@@ -12,6 +12,8 @@ import { createUserProfile } from '../../services/UserService';
 import { uploadImageToFirebase } from '../../services/ImageService';
 import { auth } from '../../config/firebase';
 import ProgressBar from '../../components/ProgressBar';
+import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const MIN_PHOTOS = 2;
 const MAX_PHOTOS = 6;
@@ -83,6 +85,7 @@ export default function PhotoUploadScreen({ navigation, route }) {
           console.warn('Individual photo upload failed, using local URI fallback:', uploadErr.message);
           uploadedPhotoUrls.push(localUri);
           offlineFallbackUsed = true;
+          break; // break early or continue
         }
       }
 
@@ -132,7 +135,7 @@ export default function PhotoUploadScreen({ navigation, route }) {
         birthdate: route.params?.birthday,
         gender: route.params?.gender,
         genderPreference: route.params?.interestedIn ? [route.params.interestedIn] : ['Everyone'],
-        bio: '',
+        bio: bioValue,
         interests: route.params?.interests || [],
         photos: uploadedPhotoUrls,
         latitude: locationData.latitude,
@@ -170,15 +173,7 @@ export default function PhotoUploadScreen({ navigation, route }) {
         }, 200);
       };
 
-      if (offlineFallbackUsed) {
-        Alert.alert(
-          'Sandbox Staging Fallback',
-          'Profile saved successfully! Photos fell back to local offline storage because storage uploads were unavailable. Note: these photos will only be visible on this device.',
-          [{ text: 'Got It', onPress: navigateToMain }]
-        );
-      } else {
-        navigateToMain();
-      }
+      navigateToMain();
     } catch (err) {
       console.error(err);
       Alert.alert('Onboarding Error', err.message || 'Failed to complete profile creation. Please try again.');
@@ -215,8 +210,10 @@ export default function PhotoUploadScreen({ navigation, route }) {
           placeholder="Tell people a bit about yourself..."
           value={bio}
           onChangeText={setBio}
+          placeholderTextColor={Colors.textMuted}
           multiline
           maxLength={300}
+          selectionColor={Colors.primary}
         />
       )}
 
@@ -224,38 +221,47 @@ export default function PhotoUploadScreen({ navigation, route }) {
         style={[styles.continueButton, (!isValid || submitting) && styles.continueButtonDisabled]}
         disabled={!isValid || submitting}
         onPress={() => finishOnboarding(bio)}
+        activeOpacity={isValid && !submitting ? 0.85 : 1}
       >
-        {submitting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.continueButtonText}>Start swiping</Text>
-        )}
+        <LinearGradient
+          colors={isValid && !submitting ? Gradients.primary.colors : [Colors.border, Colors.border]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.continueGradient}
+        >
+          {submitting ? (
+            <ActivityIndicator color={Colors.white} />
+          ) : (
+            <Text style={styles.continueButtonText}>Start swiping</Text>
+          )}
+        </LinearGradient>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, paddingTop: 60, backgroundColor: '#fff' },
-  title: { fontSize: 28, fontWeight: '700', marginBottom: 4, marginTop: 16 },
-  subtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
+  container: { flex: 1, padding: Spacing.xl, paddingTop: 60, backgroundColor: Colors.background },
+  title: { fontSize: 28, fontWeight: '800', color: Colors.text, marginBottom: 4, marginTop: 16 },
+  subtitle: { fontSize: 14, color: Colors.textMuted, marginBottom: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   slot: {
-    width: '30%', aspectRatio: 0.8, borderRadius: 12, borderWidth: 1,
-    borderColor: '#e0e0e0', borderStyle: 'dashed',
+    width: '30%', aspectRatio: 0.8, borderRadius: Radius.lg, borderWidth: 1,
+    borderColor: Colors.border, borderStyle: 'dashed', backgroundColor: Colors.surface,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   photo: { width: '100%', height: '100%' },
-  plus: { fontSize: 28, color: '#ccc' },
-  bioLink: { color: '#FF4667', fontSize: 14, marginBottom: 16 },
+  plus: { fontSize: 28, color: Colors.textMuted },
+  bioLink: { color: Colors.primary, fontSize: 14, marginBottom: 16, fontWeight: '700' },
   bioInput: {
-    borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 12, padding: 14,
-    minHeight: 80, fontSize: 14, marginBottom: 16, textAlignVertical: 'top',
+    borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg, padding: 14,
+    minHeight: 80, fontSize: 14, marginBottom: 16, textAlignVertical: 'top', backgroundColor: Colors.surface,
+    color: Colors.text,
   },
   continueButton: {
-    backgroundColor: '#FF4667', borderRadius: 28, padding: 18,
-    alignItems: 'center', marginTop: 'auto',
+    borderRadius: Radius['2xl'], overflow: 'hidden', ...Shadow.md, marginTop: 'auto',
   },
-  continueButtonDisabled: { backgroundColor: '#ccc' },
-  continueButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  continueButtonDisabled: { shadowOpacity: 0, elevation: 0 },
+  continueGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  continueButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
 });
