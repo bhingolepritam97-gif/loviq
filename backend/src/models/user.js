@@ -57,6 +57,12 @@ const User = sequelize.define(
       defaultValue: 80.5, // ~50 miles
       field: "max_distance_km",
     },
+    profileScore: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+      field: "profile_score",
+    },
     bio: {
       type: DataTypes.TEXT,
       allowNull: true,

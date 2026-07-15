@@ -18,6 +18,8 @@ const profileUpdateSchema = z.object({
   ageMin: z.number().int().min(18).max(100).optional(),
   ageMax: z.number().int().min(18).max(100).optional(),
   maxDistanceKm: z.number().min(1).max(200).optional(),
+  // Profile excellence score
+  profileScore: z.number().int().min(0).max(100).optional(),
 });
 
 function isAdult(birthdateStr) {
