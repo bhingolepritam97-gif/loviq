@@ -11,6 +11,13 @@ import { fetchMatchMessages, sendMessage, subscribeToMessages, updateTypingStatu
 import { socketService } from '../../api/socket';
 import { uploadImageToFirebase, pickImageFromLibrary, takePhotoWithCamera, requestCameraAndGalleryPermissions } from '../../services/ImageService';
 
+const ICEBREAKERS = [
+  "What's your absolute go-to Sunday activity? ☀️",
+  "Tell me one thing on your bucket list this year! ✈️",
+  "If you could only eat one cuisine for the rest of your life, what is it? 🍕",
+  "What's the best travel trip you've ever taken? 🏔️"
+];
+
 export default function ChatScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { matchId } = route.params || {};
@@ -293,6 +300,24 @@ export default function ChatScreen({ route, navigation }) {
           keyboardDismissMode="on-drag"
           onScroll={handleScroll}
           scrollEventThrottle={16}
+          ListEmptyComponent={
+            <View style={styles.icebreakerContainer}>
+              <Text style={styles.icebreakerHeader}>⚡ Spark a conversation</Text>
+              <Text style={styles.icebreakerSubtitle}>Select an icebreaker to start the chat:</Text>
+              <View style={styles.icebreakerList}>
+                {ICEBREAKERS.map((prompt, idx) => (
+                  <TouchableOpacity 
+                    key={idx} 
+                    style={styles.icebreakerCard} 
+                    onPress={() => setText(prompt)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.icebreakerText}>{prompt}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          }
           renderItem={({ item }) => {
             const isMe = item.senderId === user?.uid;
             const isImage = item.text && item.text.startsWith('[image]');
@@ -467,4 +492,11 @@ const styles = StyleSheet.create({
   skeletonOther: { alignSelf: 'flex-start', borderBottomLeftRadius: Radius.xs },
   scrollBottomBtn: { position: 'absolute', bottom: 80, right: Spacing.xl, width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', ...Shadow.md, zIndex: 100 },
   bubbleImage: { width: 200, height: 200, borderRadius: Radius.md, resizeMode: 'cover' },
+  
+  icebreakerContainer: { paddingVertical: Spacing['2xl'], alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.md },
+  icebreakerHeader: { fontSize: 18, fontWeight: '800', color: Colors.text, marginBottom: 4, textAlign: 'center' },
+  icebreakerSubtitle: { fontSize: 13, color: Colors.textMuted, marginBottom: Spacing.xl, textAlign: 'center' },
+  icebreakerList: { width: '100%', gap: 12 },
+  icebreakerCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
+  icebreakerText: { fontSize: 14, color: Colors.text, fontWeight: '600', textAlign: 'center' },
 });
