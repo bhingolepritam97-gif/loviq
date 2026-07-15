@@ -33,6 +33,7 @@ async function getDeck(req, res) {
     // Age preferences — use persisted filter values, fall back to broad range
     const ageMin = me.ageMin || 18;
     const ageMax = me.ageMax || 100;
+    const verifiedOnly = req.query.verifiedOnly === 'true' || me.verifiedOnly === true;
 
     const [myLng, myLat] = me.location.coordinates;
     const myGender = me.gender || 'Woman';
@@ -40,7 +41,7 @@ async function getDeck(req, res) {
 
     console.log(`[Deck debug] User requesting deck: ID=${me.id}, Gender=${myGender}, Prefs=${JSON.stringify(myGenderPrefs)}`);
     console.log(`[Deck debug] User coordinates: lat=${myLat}, lng=${myLng}`);
-    console.log(`[Deck debug] Filter parameters: maxDistanceKm=${maxDistanceMeters / 1000}km, ageMin=${ageMin}, ageMax=${ageMax}`);
+    console.log(`[Deck debug] Filter parameters: maxDistanceKm=${maxDistanceMeters / 1000}km, ageMin=${ageMin}, ageMax=${ageMax}, verifiedOnly=${verifiedOnly}`);
 
     // ── Cursor: resolve the distance of the last-seen card ─────────────────
     let cursorDistance = null;
@@ -103,6 +104,7 @@ async function getDeck(req, res) {
           OR (:myGender = 'Woman' AND 'Women' = ANY(u.gender_preference))
           OR (:myGender = 'Man'   AND 'Men'   = ANY(u.gender_preference))
         )
+        AND (:verifiedOnly = false OR u.is_verified = true)
         AND u.id NOT IN (
           SELECT swiped_id FROM swipes WHERE swiper_id = :myId
         )
@@ -113,11 +115,11 @@ async function getDeck(req, res) {
           SELECT blocker_id FROM blocks WHERE blocked_id = :myId
         )
         -- Keyset cursor: skip everything at or before the last-seen (distance, id) pair
-        ${cursorDistance !== null
-          ? `AND (
+        \${cursorDistance !== null
+          ? \`AND (
                ST_Distance(u.location, ST_SetSRID(ST_MakePoint(:myLng, :myLat), 4326)::geography),
                u.id::text
-             ) > (:cursorDistance, :cursorId)`
+             ) > (:cursorDistance, :cursorId)\`
           : ''}
       GROUP BY u.id
       ORDER BY distance_meters ASC, u.last_active_at DESC
@@ -134,6 +136,7 @@ async function getDeck(req, res) {
           ageMin,
           ageMax,
           limit,
+          verifiedOnly,
           ...(cursorDistance !== null ? { cursorDistance, cursorId } : {}),
         },
       }

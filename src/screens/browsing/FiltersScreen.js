@@ -20,6 +20,7 @@ import {
   PanResponder,
   ActivityIndicator,
   Platform,
+  Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -204,9 +205,12 @@ export default function FiltersScreen({ navigation }) {
   const initAgeRange   = profile?.age_range ?? [profile?.ageMin ?? 18, profile?.ageMax ?? 65];
   const initGender     = profile?.interestedIn ?? 'Everyone';
 
+  const initVerifiedOnly = profile?.verifiedOnly ?? false;
+
   const [gender, setGender]         = useState(initGender);
   const [distanceKm, setDistanceKm] = useState(initDistanceKm);
   const [ageRange, setAgeRange]     = useState(initAgeRange);
+  const [verifiedOnly, setVerifiedOnly] = useState(initVerifiedOnly);
   const [saving, setSaving]         = useState(false);
 
   const distanceMiles = Math.round(distanceKm * KM_TO_MI);
@@ -216,7 +220,8 @@ export default function FiltersScreen({ navigation }) {
     gender !== initGender ||
     Math.round(distanceKm) !== Math.round(initDistanceKm) ||
     ageRange[0] !== initAgeRange[0] ||
-    ageRange[1] !== initAgeRange[1];
+    ageRange[1] !== initAgeRange[1] ||
+    verifiedOnly !== initVerifiedOnly;
 
   const handleApply = useCallback(async () => {
     if (saving) return;
@@ -227,6 +232,7 @@ export default function FiltersScreen({ navigation }) {
       maxDistanceKm: distanceKm,
       ageMin: ageRange[0],
       ageMax: ageRange[1],
+      verifiedOnly: verifiedOnly,
     };
 
     // Optimistic local update so Discover refetches immediately on back()
@@ -238,6 +244,7 @@ export default function FiltersScreen({ navigation }) {
       ageMin: ageRange[0],
       ageMax: ageRange[1],
       age_range: ageRange,
+      verifiedOnly: verifiedOnly,
     });
 
     try {
@@ -251,12 +258,13 @@ export default function FiltersScreen({ navigation }) {
     }
 
     navigation.goBack();
-  }, [saving, gender, distanceKm, ageRange, profile, user]);
+  }, [saving, gender, distanceKm, ageRange, verifiedOnly, profile, user]);
 
   const handleReset = useCallback(() => {
     setGender('Everyone');
     setDistanceKm(80.5);
     setAgeRange([18, 65]);
+    setVerifiedOnly(false);
   }, []);
 
   return (
@@ -370,6 +378,22 @@ export default function FiltersScreen({ navigation }) {
           <View style={styles.sliderEndLabels}>
             <Text style={styles.sliderEndLabel}>18</Text>
             <Text style={styles.sliderEndLabel}>75+</Text>
+          </View>
+        </Section>
+
+        {/* ── Dealbreakers ────────────────────────────────────────────────── */}
+        <Section title="Dealbreakers">
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1, paddingRight: Spacing.sm }}>
+              <Text style={styles.switchLabel}>Verified Profiles Only</Text>
+              <Text style={styles.switchSublabel}>Only show profiles that have verified photos.</Text>
+            </View>
+            <Switch
+              value={verifiedOnly}
+              onValueChange={setVerifiedOnly}
+              trackColor={{ true: Colors.primary, false: Colors.border }}
+              thumbColor={Colors.white}
+            />
           </View>
         </Section>
 
@@ -667,5 +691,22 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: Typography.fontSize.base,
     letterSpacing: 0.2,
+  },
+  
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.xs,
+  },
+  switchLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  switchSublabel: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
   },
 });

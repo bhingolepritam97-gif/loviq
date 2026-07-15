@@ -118,12 +118,13 @@ const DeckCache = {
 };
 
 // ── Internal fetch helper ──────────────────────────────────────────────────
-async function _fetchPage(radiusKm, afterId = null) {
+async function _fetchPage(radiusKm, afterId = null, verifiedOnly = false) {
   const params = new URLSearchParams({
     limit: String(PAGE_SIZE),
     maxDistanceKm: String(Math.min(radiusKm, MAX_RADIUS_KM)),
   });
   if (afterId) params.set('after_id', afterId);
+  if (verifiedOnly) params.set('verifiedOnly', 'true');
 
   const response = await apiClient(`/deck?${params.toString()}`);
   return response; // { success, candidates, nextCursor, hasMore }
@@ -131,13 +132,13 @@ async function _fetchPage(radiusKm, afterId = null) {
 
 // ── Auto-expand helper ─────────────────────────────────────────────────────
 // Doubles radius up to MAX_RADIUS_KM until we have MIN_RESULTS_BEFORE_EXPAND results.
-async function _fetchWithFallback(initialRadiusKm) {
+async function _fetchWithFallback(initialRadiusKm, verifiedOnly = false) {
   let radiusKm = initialRadiusKm;
   let response;
 
   while (true) {
     try {
-      response = await _fetchPage(radiusKm);
+      response = await _fetchPage(radiusKm, null, verifiedOnly);
     } catch (err) {
       throw err;
     }
@@ -181,17 +182,19 @@ export const getPotentialMatches = async (
   const radiusKm =
     userProfile.maxDistanceKm ||
     (userProfile.distance_range ? userProfile.distance_range * MILES_TO_KM : defaultRadiusMiles * MILES_TO_KM);
+  const verifiedOnly = userProfile.verifiedOnly || false;
 
   try {
     let response;
     if (!DeckCache._cursor && !DeckCache._exhausted) {
       // First page — use auto-expand fallback
-      response = await _fetchWithFallback(radiusKm);
+      response = await _fetchWithFallback(radiusKm, verifiedOnly);
     } else if (!DeckCache._exhausted) {
       // Subsequent pages — use the effective (possibly expanded) radius
       response = await _fetchPage(
         DeckCache._effectiveRadiusKm,
-        DeckCache._cursor
+        DeckCache._cursor,
+        verifiedOnly
       );
     } else {
       return [];

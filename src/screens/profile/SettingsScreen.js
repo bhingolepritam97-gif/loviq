@@ -13,7 +13,7 @@ import * as WebBrowser from 'expo-web-browser';
 export default function SettingsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { profile, setProfile, user } = useAuth();
-  const [notifications, setNotifications] = useState(true);
+  const [notifications, setNotifications] = useState(profile?.notificationsEnabled !== false);
   const [showActive, setShowActive] = useState(true);
   const [incognito, setIncognito] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -21,6 +21,20 @@ export default function SettingsScreen({ navigation }) {
   // Privacy and Visibility Switches states
   const [hideDistance, setHideDistance] = useState(profile?.hideDistance || false);
   const [paused, setPaused] = useState(profile?.isActive === false);
+
+  const handleToggleNotifications = async (val) => {
+    setNotifications(val);
+    if (user && profile) {
+      setProfile({ ...profile, notificationsEnabled: val });
+      const { doc, updateDoc } = require('firebase/firestore');
+      const { db } = require('../../config/firebase');
+      try {
+        await updateDoc(doc(db, 'profiles', user.uid), { notificationsEnabled: val });
+      } catch (e) {
+        console.warn('Failed syncing notifications switch to Firestore:', e.message);
+      }
+    }
+  };
 
   const handleOpenPrivacy = async () => {
     try {
@@ -132,7 +146,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <Switch
               value={notifications}
-              onValueChange={setNotifications}
+              onValueChange={handleToggleNotifications}
               trackColor={{ true: Colors.primary, false: Colors.border }}
               thumbColor={Colors.white}
             />
