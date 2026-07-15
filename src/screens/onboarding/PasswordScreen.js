@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadow, Typography, Spacing, Radius } from '../../theme';
 import Input from '../../components/Input';
 import { auth } from '../../config/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 
 export default function PasswordScreen({ route, navigation }) {
   const { email, isLogin } = route.params || {};
@@ -14,6 +14,7 @@ export default function PasswordScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [secureTextEntry, setSecureTextEntry] = useState(true);
+  const [resetSent, setResetSent] = useState(false);
   const insets = useSafeAreaInsets();
 
   const handleContinue = async () => {
@@ -54,6 +55,17 @@ export default function PasswordScreen({ route, navigation }) {
     }
   };
 
+  const handleForgotPassword = async () => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetSent(true);
+      setError('');
+    } catch (err) {
+      console.warn('[FirebaseAuth Error]', err.code, err.message);
+      setError('Failed to send password reset email. Please try again later.');
+    }
+  };
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <LinearGradient colors={['#FFF8F8', '#FFFFFF', '#FFFFFF']} style={StyleSheet.absoluteFill} />
@@ -89,6 +101,14 @@ export default function PasswordScreen({ route, navigation }) {
             }
           />
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          
+          {isLogin && (
+            <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPasswordContainer}>
+              <Text style={styles.forgotPasswordText}>
+                {resetSent ? 'Reset link sent to your email!' : 'Forgot Password?'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <TouchableOpacity 
@@ -126,4 +146,6 @@ const styles = StyleSheet.create({
   continueButtonDisabled: { shadowOpacity: 0, elevation: 0 },
   btnGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
   continueButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  forgotPasswordContainer: { marginTop: 12, alignSelf: 'flex-start' },
+  forgotPasswordText: { color: Colors.primary, fontSize: 14, fontWeight: '600' },
 });
