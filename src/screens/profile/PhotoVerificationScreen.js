@@ -7,10 +7,11 @@ import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../th
 import { useAuth } from '../../context/AuthContext';
 import { verifyUser } from '../../services/UserService';
 import * as ImagePicker from 'expo-image-picker';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 export default function PhotoVerificationScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, profile, setProfile } = useAuth();
   const [step, setStep] = useState(1);
   const [verifyMethod, setVerifyMethod] = useState('selfie'); // 'selfie' | 'document'
   const [docPhoto, setDocPhoto] = useState(null);
@@ -19,7 +20,12 @@ export default function PhotoVerificationScreen({ navigation }) {
   // Simulated Selfie Camera Scan States
   const [scanStatus, setScanStatus] = useState('idle'); // 'idle' | 'scanning' | 'completed'
   const [scanProgress, setScanProgress] = useState(0);
+  const [capturedSelfie, setCapturedSelfie] = useState(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
+  const cameraRef = useRef(null);
+
+  // Camera permissions hook
+  const [permission, requestPermission] = useCameraPermissions();
 
   const startScanningAnimation = () => {
     scanLineAnim.setValue(0);
@@ -41,15 +47,37 @@ export default function PhotoVerificationScreen({ navigation }) {
     ).start();
   };
 
-  const handleStartScan = () => {
+  const handleStartScan = async () => {
+    if (!permission || !permission.granted) {
+      const res = await requestPermission();
+      if (!res.granted) {
+        Alert.alert('Camera Permission Required', 'Please enable camera permissions to perform the biometric face scan.');
+        return;
+      }
+    }
+
     setScanStatus('scanning');
     setScanProgress(0);
     startScanningAnimation();
     
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       setScanProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
+          
+          // Capture photo from active camera stream once scan completes
+          if (cameraRef.current) {
+            cameraRef.current.takePictureAsync({ quality: 0.5, skipProcessing: false })
+              .then(photo => {
+                if (photo?.uri) {
+                  setCapturedSelfie(photo.uri);
+                }
+              })
+              .catch(err => {
+                console.warn('[PhotoVerification] Failed taking picture from camera stream:', err.message);
+              });
+          }
+
           setScanStatus('completed');
           scanLineAnim.setValue(0.5); // Reset to center
           return 100;
@@ -89,6 +117,9 @@ export default function PhotoVerificationScreen({ navigation }) {
         const success = await verifyUser(user.uid);
         setLoading(false);
         if (success) {
+          if (profile) {
+            setProfile({ ...profile, isVerified: true });
+          }
           Alert.alert(
             'Verification Submitted!',
             verifyMethod === 'selfie' 
@@ -177,18 +208,51 @@ export default function PhotoVerificationScreen({ navigation }) {
             </Text>
             
             <View style={styles.cameraPlaceholder}>
-              {/* Outer scanning circle */}
-              <View style={[
-                styles.scanCircle, 
-                scanStatus === 'scanning' && styles.scanCircleScanning,
-                scanStatus === 'completed' && styles.scanCircleCompleted
-              ]}>
-                <Ionicons 
-                  name={scanStatus === 'completed' ? "shield-checkmark" : "person-outline"} 
-                  size={100} 
-                  color={scanStatus === 'completed' ? '#34A853' : scanStatus === 'scanning' ? Colors.primary : 'rgba(255,255,255,0.4)'} 
+              {permission && permission.granted && scanStatus !== 'completed' ? (
+                <CameraView
+                  ref={cameraRef}
+                  style={StyleSheet.absoluteFillObject}
+                  facing="front"
                 />
-              </View>
+              ) : capturedSelfie ? (
+                <Image source={{ uri: capturedSelfie }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+              ) : null}
+
+              {/* Camera Permission Request Overlay inside viewport */}
+              {(!permission || !permission.granted) && scanStatus === 'idle' && (
+                <View style={styles.permissionBox}>
+                  <Ionicons name="camera-reverse" size={36} color="rgba(255,255,255,0.4)" style={{ marginBottom: Spacing.sm }} />
+                  <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
+                    <Text style={styles.permissionBtnText}>Enable Camera</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Outer scanning circle / alignment helper overlay */}
+              {scanStatus !== 'completed' && (
+                <View style={[
+                  styles.scanCircle, 
+                  scanStatus === 'scanning' && styles.scanCircleScanning,
+                  scanStatus === 'completed' && styles.scanCircleCompleted
+                ]}>
+                  {scanStatus === 'idle' && (
+                    <Ionicons 
+                      name="person-outline" 
+                      size={100} 
+                      color="rgba(255,255,255,0.4)" 
+                    />
+                  )}
+                </View>
+              )}
+
+              {/* Completed checkmark overlay */}
+              {scanStatus === 'completed' && (
+                <View style={styles.completedOverlay}>
+                  <View style={styles.completedBadge}>
+                    <Ionicons name="checkmark-circle" size={48} color="#34A853" />
+                  </View>
+                </View>
+              )}
 
               {/* Glowing vertical scan line */}
               {scanStatus === 'scanning' && (
@@ -197,13 +261,17 @@ export default function PhotoVerificationScreen({ navigation }) {
 
               {scanStatus !== 'completed' && (
                 <Text style={styles.cameraText}>
-                  {scanStatus === 'scanning' ? 'Analyzing features...' : 'Selfie Camera Viewport'}
+                  {scanStatus === 'scanning' ? 'Analyzing features...' : 'Biometric Viewport'}
                 </Text>
               )}
             </View>
 
             {scanStatus === 'idle' && (
-              <TouchableOpacity style={styles.scanBtn} onPress={handleStartScan}>
+              <TouchableOpacity
+                id="start-biometric-scan-btn"
+                style={styles.scanBtn}
+                onPress={handleStartScan}
+              >
                 <Text style={styles.scanBtnText}>Start Biometric Scan</Text>
               </TouchableOpacity>
             )}
@@ -296,7 +364,40 @@ const styles = StyleSheet.create({
   scanCircleScanning: { borderColor: Colors.primary, borderStyle: 'solid' },
   scanCircleCompleted: { borderColor: '#34A853', borderStyle: 'solid', backgroundColor: 'rgba(52,168,83,0.08)' },
   scanLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 4, backgroundColor: Colors.primary, shadowColor: Colors.primary, shadowOpacity: 0.8, shadowRadius: 10, elevation: 5 },
-  cameraText: { color: Colors.textMuted, position: 'absolute', bottom: Spacing.md, fontSize: 12, fontWeight: '600', uppercase: true, letterSpacing: 0.5 },
+  cameraText: { color: Colors.textMuted, position: 'absolute', bottom: Spacing.md, fontSize: 12, fontWeight: '600', uppercase: true, letterSpacing: 0.5, zIndex: 10 },
+
+  // Permission box overlay styles
+  permissionBox: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0F0F1A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 15,
+  },
+  permissionBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: Radius.full,
+  },
+  permissionBtnText: {
+    color: Colors.white,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  completedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    zIndex: 10,
+  },
+  completedBadge: {
+    backgroundColor: Colors.white,
+    borderRadius: 36,
+    padding: 2,
+    ...Shadow.md,
+  },
 
   scanBtn: { marginTop: Spacing.xl, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.full, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.xl, ...Shadow.sm },
   scanBtnText: { color: Colors.primary, fontWeight: '800', fontSize: 14 },
