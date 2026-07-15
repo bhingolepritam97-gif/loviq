@@ -7,6 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import { auth } from '../../config/firebase';
 import { signOut } from 'firebase/auth';
 import { updateUserProfile } from '../../services/UserService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as WebBrowser from 'expo-web-browser';
 
 export default function SettingsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -19,6 +21,24 @@ export default function SettingsScreen({ navigation }) {
   // Privacy and Visibility Switches states
   const [hideDistance, setHideDistance] = useState(profile?.hideDistance || false);
   const [paused, setPaused] = useState(profile?.isActive === false);
+
+  const handleOpenPrivacy = async () => {
+    try {
+      await WebBrowser.openBrowserAsync('https://velaapp.com/privacy');
+    } catch (err) {
+      console.warn('Error opening privacy policy:', err);
+      Alert.alert('Error', 'Unable to open browser.');
+    }
+  };
+
+  const handleOpenTerms = async () => {
+    try {
+      await WebBrowser.openBrowserAsync('https://velaapp.com/terms');
+    } catch (err) {
+      console.warn('Error opening terms of service:', err);
+      Alert.alert('Error', 'Unable to open browser.');
+    }
+  };
 
   const handleToggleHideDistance = async (val) => {
     setHideDistance(val);
@@ -52,6 +72,9 @@ export default function SettingsScreen({ navigation }) {
         { text: "Log Out", style: "destructive", onPress: async () => {
           try {
             setLoggingOut(true);
+            if (user) {
+              await AsyncStorage.removeItem(`profileComplete_${user.uid}`);
+            }
             await signOut(auth);
             // AuthContext will detect null user and redirect to Onboarding automatically
           } catch (err) {
@@ -192,7 +215,7 @@ export default function SettingsScreen({ navigation }) {
         <View style={styles.settingGroup}>
           <TouchableOpacity 
             style={styles.settingItem} 
-            onPress={() => Alert.alert('Privacy Policy', 'The Privacy Policy will be hosted on your website and displayed here in a webview.')}
+            onPress={handleOpenPrivacy}
           >
             <View style={styles.itemLeft}>
               <Ionicons name="document-text-outline" size={20} color={Colors.text} style={styles.itemIcon} />
@@ -202,7 +225,7 @@ export default function SettingsScreen({ navigation }) {
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.settingItem, { borderBottomWidth: 0 }]} 
-            onPress={() => Alert.alert('Terms of Service', 'The Terms of Service will be hosted on your website and displayed here in a webview.')}
+            onPress={handleOpenTerms}
           >
             <View style={styles.itemLeft}>
               <Ionicons name="document-text-outline" size={20} color={Colors.text} style={styles.itemIcon} />
@@ -226,6 +249,9 @@ export default function SettingsScreen({ navigation }) {
             { text: 'Cancel', style: 'cancel' },
             { text: 'Delete', style: 'destructive', onPress: async () => {
               try {
+                if (user) {
+                  await AsyncStorage.removeItem(`profileComplete_${user.uid}`);
+                }
                 await auth?.currentUser?.delete();
               } catch (err) {
                 Alert.alert('Error', 'Please log out and log back in before deleting your account.');
@@ -242,18 +268,18 @@ export default function SettingsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, height: 60, backgroundColor: Colors.surface, zIndex: 10, ...Shadow.sm },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, height: 60, backgroundColor: Colors.background, borderBottomWidth: 1, borderBottomColor: Colors.border, zIndex: 10 },
   backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: Typography.fontSize.lg, fontWeight: '700', color: Colors.text },
   scroll: { padding: Spacing.xl, paddingBottom: 100 },
   groupTitle: { fontSize: 13, fontWeight: '700', color: Colors.textLight, textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.sm },
-  settingGroup: { backgroundColor: Colors.white, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing.xl, marginBottom: Spacing.xl, overflow: 'hidden', ...Shadow.sm },
+  settingGroup: { backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing.xl, marginBottom: Spacing.xl, overflow: 'hidden', ...Shadow.sm },
   settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.lg, borderBottomWidth: 1, borderColor: Colors.border },
   itemLeft: { flexDirection: 'row', alignItems: 'center' },
   itemIcon: { marginRight: Spacing.md },
   itemLabel: { fontSize: 15, fontWeight: '600', color: Colors.text },
   itemVal: { fontSize: 14, color: Colors.textMuted },
-  logoutButton: { backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.full, paddingVertical: Spacing.md, alignItems: 'center', marginTop: Spacing.xl, ...Shadow.sm },
+  logoutButton: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius['2xl'], paddingVertical: Spacing.md, alignItems: 'center', marginTop: Spacing.xl, ...Shadow.sm },
   logoutText: { color: Colors.primary, fontWeight: '700', fontSize: 16 },
   deleteButton: { paddingVertical: Spacing.md, alignItems: 'center', marginTop: Spacing.md },
   deleteText: { color: Colors.error, fontSize: Typography.fontSize.sm, fontWeight: '600' },

@@ -41,6 +41,26 @@ import { signOut } from 'firebase/auth';
 const RootStack = createStackNavigator();
 const navigationRef = React.createRef();
 
+const linking = {
+  prefixes: ['vela://', 'https://velaapp.com'],
+  config: {
+    screens: {
+      Main: {
+        screens: {
+          Discover: 'discover',
+          Explore: 'explore',
+          Likes: 'likes',
+          Chats: 'chats',
+          Profile: 'profile',
+        },
+      },
+      Chat: 'chat/:matchId',
+      Premium: 'premium',
+      ActiveCall: 'call/:fromUserId/:callType',
+    },
+  },
+};
+
 export default function AppNavigator() {
   const { user, profile, loading, connectionError, refreshProfile } = useAuth();
   const [incomingCall, setIncomingCall] = useState(null);
@@ -48,7 +68,7 @@ export default function AppNavigator() {
 
   // WebRTC socket listener for incoming calls
   useEffect(() => {
-    if (user) {
+    if (user && profile?.profileComplete) {
       socketService.connect().then(socket => {
         if (socket) {
           socket.off('call_incoming'); // Clear existing listeners to prevent duplication
@@ -72,7 +92,7 @@ export default function AppNavigator() {
         socket.off('call_incoming');
       }
     };
-  }, [user]);
+  }, [user, profile]);
 
   const dismissCallBanner = (callback) => {
     Animated.timing(slideAnim, {
@@ -149,6 +169,14 @@ export default function AppNavigator() {
         <TouchableOpacity 
           style={{ marginTop: Spacing.xl }} 
           onPress={async () => {
+            try {
+              if (user) {
+                const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                await AsyncStorage.removeItem(`profileComplete_${user.uid}`);
+              }
+            } catch (e) {
+              console.warn('Failed clearing profileComplete in AppNavigator logout:', e.message);
+            }
             await signOut(auth);
           }}
         >
@@ -160,16 +188,13 @@ export default function AppNavigator() {
 
   return (
     <View style={{ flex: 1 }}>
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer ref={navigationRef} linking={linking}>
         <RootStack.Navigator screenOptions={{ headerShown: false }}>
           {!user ? (
             // Unauthenticated Flow
-            <>
-              <RootStack.Screen name="Onboarding">
-                {(props) => <OnboardingNavigator {...props} initialRouteName="Splash" />}
-              </RootStack.Screen>
-              <RootStack.Screen name="Main" component={MainTabNavigator} />
-            </>
+            <RootStack.Screen name="Onboarding">
+              {(props) => <OnboardingNavigator {...props} initialRouteName="Splash" />}
+            </RootStack.Screen>
           ) : !profile?.profileComplete ? (
             // Authenticated but profile incomplete
             <RootStack.Screen name="Onboarding">
