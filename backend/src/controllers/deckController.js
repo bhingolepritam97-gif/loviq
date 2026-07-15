@@ -21,12 +21,15 @@ async function getDeck(req, res) {
       });
     }
 
-    // Cap max distance to 200 km to prevent DB strain
+    // Cap max distance to 200 km to prevent DB strain.
+    // Prefer: explicit query param > user's saved preference > 80.5 km (~50 mi) default
     let maxDistanceMeters =
-      (req.query.maxDistanceKm ? parseFloat(req.query.maxDistanceKm) : 50) * 1000;
+      (req.query.maxDistanceKm
+        ? parseFloat(req.query.maxDistanceKm)
+        : (me.maxDistanceKm || 80.5)) * 1000;
     if (maxDistanceMeters > 200000) maxDistanceMeters = 200000;
 
-    // Age preferences (fallback to broad range if not set)
+    // Age preferences — use persisted filter values, fall back to broad range
     const ageMin = me.ageMin || 18;
     const ageMax = me.ageMax || 100;
 

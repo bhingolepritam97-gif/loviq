@@ -56,6 +56,13 @@ function mapBackendUserToProfile(u) {
     starSign: u.starSign || u.star_sign || null,
     anthemSong: u.anthemSong || u.anthem_song || null,
     anthemArtist: u.anthemArtist || u.anthem_artist || null,
+    // Discovery filter preferences (persisted to backend)
+    ageMin: u.ageMin ?? u.age_min ?? 18,
+    ageMax: u.ageMax ?? u.age_max ?? 65,
+    maxDistanceKm: u.maxDistanceKm ?? u.max_distance_km ?? 80.5,
+    // Derived convenience fields for components that use legacy naming
+    distance_range: Math.round((u.maxDistanceKm ?? u.max_distance_km ?? 80.5) / 1.60934),
+    age_range: [u.ageMin ?? u.age_min ?? 18, u.ageMax ?? u.age_max ?? 65],
   };
 }
 
@@ -108,6 +115,16 @@ export const updateUserProfile = async (uid, data) => {
   if (data.starSign !== undefined) payload.starSign = data.starSign;
   if (data.anthemSong !== undefined) payload.anthemSong = data.anthemSong;
   if (data.anthemArtist !== undefined) payload.anthemArtist = data.anthemArtist;
+  // Discovery filter preferences
+  if (data.ageMin !== undefined) payload.ageMin = data.ageMin;
+  if (data.ageMax !== undefined) payload.ageMax = data.ageMax;
+  if (data.maxDistanceKm !== undefined) payload.maxDistanceKm = data.maxDistanceKm;
+  // Legacy field names used by FiltersScreen — translate them
+  if (data.distance_range !== undefined) payload.maxDistanceKm = data.distance_range * 1.60934;
+  if (data.age_range !== undefined) {
+    payload.ageMin = data.age_range[0];
+    payload.ageMax = data.age_range[1];
+  }
   
   const lat = data.location?.latitude !== undefined ? data.location.latitude : data.latitude;
   const lng = data.location?.longitude !== undefined ? data.location.longitude : data.longitude;

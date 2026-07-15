@@ -38,6 +38,25 @@ const User = sequelize.define(
       allowNull: true,
       field: "gender_preference",
     },
+    // Discovery filter preferences — persisted so they survive app restarts
+    ageMin: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 18,
+      field: "age_min",
+    },
+    ageMax: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 65,
+      field: "age_max",
+    },
+    maxDistanceKm: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      defaultValue: 80.5, // ~50 miles
+      field: "max_distance_km",
+    },
     bio: {
       type: DataTypes.TEXT,
       allowNull: true,

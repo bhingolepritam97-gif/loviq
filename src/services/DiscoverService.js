@@ -176,8 +176,11 @@ export const getPotentialMatches = async (
 ) => {
   if (!currentUserUid || !userProfile) return [];
 
-  const radiusMiles = userProfile.distance_range || defaultRadiusMiles;
-  const radiusKm = radiusMiles * MILES_TO_KM;
+  // Prefer canonical maxDistanceKm (persisted to backend).
+  // Fall back to legacy distance_range (miles) or the defaultRadius argument.
+  const radiusKm =
+    userProfile.maxDistanceKm ||
+    (userProfile.distance_range ? userProfile.distance_range * MILES_TO_KM : defaultRadiusMiles * MILES_TO_KM);
 
   try {
     let response;

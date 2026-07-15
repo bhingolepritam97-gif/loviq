@@ -14,6 +14,10 @@ const profileUpdateSchema = z.object({
   cityName: z.string().optional(),
   isActive: z.boolean().optional(),       // Pause/resume account visibility
   hideDistance: z.boolean().optional(),   // Hide exact distance from other users
+  // Discovery filter preferences
+  ageMin: z.number().int().min(18).max(100).optional(),
+  ageMax: z.number().int().min(18).max(100).optional(),
+  maxDistanceKm: z.number().min(1).max(200).optional(),
 });
 
 function isAdult(birthdateStr) {
