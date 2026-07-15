@@ -68,7 +68,8 @@ export default function usePhotoUpload(initialPhotos = [], maxPhotos = 6) {
           blurScore: 'Excellent', 
           lightingScore: 'Good', 
           smileDetected: true, 
-          passed: true 
+          passed: true,
+          warnings: []
         };
 
         setPhotos(prev => prev.map(p => p.id === photoId ? {

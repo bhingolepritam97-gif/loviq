@@ -7,6 +7,7 @@ const router = express.Router();
 router.patch("/me/push-token", requireAuth, ctrl.updatePushToken);
 router.get("/me", requireAuth, ctrl.getCurrentUser);
 router.patch("/me", requireAuth, ctrl.updateCurrentUser);
+router.post("/me/ai-suggestions", requireAuth, ctrl.getAiSuggestions);
 router.get("/:id", requireAuth, ctrl.getUser);
 router.patch("/:id", requireAuth, ctrl.updateUser);
 router.delete("/:id", requireAuth, ctrl.deleteUser);

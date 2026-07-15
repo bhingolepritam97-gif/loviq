@@ -72,9 +72,16 @@ export default function ManagePhotosScreen({ navigation }) {
       if (photos[idx]) {
         const ai = photos[idx].aiResults;
         if (ai) {
+          const warningText = ai.warnings && ai.warnings.length > 0
+            ? `\n\nAdvisories:\n• ${ai.warnings.join('\n• ')}`
+            : '';
           Alert.alert(
             'AI Photo Audit 🤖',
-            `Face Detected: ${ai.faceDetected ? 'Yes' : 'No'}\nLighting: ${ai.lightingScore}\nSmile: ${ai.smileDetected ? 'Yes' : 'No'}\nStatus: Passed ✔`
+            `Face Detected: ${ai.faceDetected ? 'Yes' : 'No'}\n` +
+            `Lighting: ${ai.lightingScore}\n` +
+            `Smile: ${ai.smileDetected ? 'Yes' : 'No'}\n` +
+            `Resolution: ${ai.resolution || '1080x1440'}\n` +
+            `Status: ${ai.warnings && ai.warnings.length > 0 ? 'Quality Advisory ⚠️' : 'Passed ✔'}${warningText}`
           );
         }
       }
@@ -120,6 +127,19 @@ export default function ManagePhotosScreen({ navigation }) {
               : "Tap any photo to run an AI photo health audit. Toggle reorder mode to swap positions."}
           </Text>
         </View>
+
+        {/* Soft warning banner if main photo has quality issues */}
+        {photos[0]?.aiResults?.warnings && photos[0].aiResults.warnings.length > 0 && (
+          <View style={styles.warningBanner}>
+            <Text style={styles.warningEmoji}>⚠️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.warningBannerTitle}>Main Photo Advisory</Text>
+              <Text style={styles.warningBannerText}>
+                {photos[0].aiResults.warnings[0]}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Toggle Mode Buttons */}
         <View style={styles.modeRow}>
@@ -190,8 +210,13 @@ export default function ManagePhotosScreen({ navigation }) {
 
                     {/* AI evaluation stamp icon */}
                     {photo.aiResults && !isReorderMode && (
-                      <View style={styles.aiBadge}>
-                        <Text style={styles.aiBadgeText}>🤖 Audit Ok</Text>
+                      <View style={[
+                        styles.aiBadge,
+                        photo.aiResults.warnings && photo.aiResults.warnings.length > 0 && styles.aiBadgeWarning
+                      ]}>
+                        <Text style={styles.aiBadgeText}>
+                          {photo.aiResults.warnings && photo.aiResults.warnings.length > 0 ? '⚠️ Audit Alert' : '🤖 Audit Ok'}
+                        </Text>
                       </View>
                     )}
 
@@ -274,4 +299,36 @@ const styles = StyleSheet.create({
   addSlotLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
 
   footerSpacing: { marginTop: Spacing['2xl'] },
+
+  // Warning Banner Styles
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E6',
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: '#FFB800',
+    padding: Spacing.md,
+    marginBottom: Spacing.xl,
+    gap: Spacing.md,
+    ...Shadow.sm,
+  },
+  warningEmoji: {
+    fontSize: 22,
+  },
+  warningBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#D97706',
+    marginBottom: 2,
+  },
+  warningBannerText: {
+    fontSize: 12,
+    color: '#B45309',
+    lineHeight: 17,
+    fontWeight: '500',
+  },
+  aiBadgeWarning: {
+    backgroundColor: '#FFB800',
+  },
 });

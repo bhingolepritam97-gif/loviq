@@ -310,4 +310,120 @@ async function reportUser(req, res) {
   }
 }
 
-module.exports = { getCurrentUser, updateCurrentUser, getUser, updateUser, deleteUser, addPhoto, deletePhoto, reorderPhotos, updatePushToken, blockUser, unblockUser, getBlocks, reportUser };
+// POST /users/me/ai-suggestions
+async function getAiSuggestions(req, res) {
+  const { type, text, interests, promptQuestion } = req.body;
+
+  if (!type || (type !== 'bio' && type !== 'prompt')) {
+    return res.status(400).json({ success: false, error: "Type must be 'bio' or 'prompt'" });
+  }
+
+  const userDraft = text ? text.trim() : "";
+  const userInterests = Array.isArray(interests) ? interests : [];
+
+  // ── RICH OFFLINE SUGGESTIONS FALLBACK ─────────────────────────────────────
+  const getOfflineSuggestions = () => {
+    const interestStr = userInterests.length > 0 ? userInterests.slice(0, 3).join(", ") : "new experiences";
+    if (type === 'bio') {
+      return [
+        `Always down for coffee, conversations, and ${interestStr}. Let's see where the adventure takes us!`,
+        `Curious explorer who loves ${interestStr}. Looking for a partner-in-crime for weekend plans.`,
+        `Let's start with a casual coffee and talk about ${userInterests[0] || 'our favorite movies'} and everything else.`
+      ];
+    } else {
+      // Prompt completions based on predefined questions
+      const q = promptQuestion || "";
+      if (q.includes("Sunday")) {
+        return [
+          `Starting with a warm coffee, then exploring ${userInterests[0] || 'the outdoors'} or reading.`,
+          `Finding a quiet corner at a coffee shop and plotting my next ${userInterests[1] || 'travel'} trip.`,
+          `A mix of lazy mornings, cooking something new, and planning a weekend trek.`
+        ];
+      } else if (q.includes("fact")) {
+        return [
+          `That ${userInterests[0] || 'hiking'} releases more endorphins than scrolling on social media!`,
+          `I actually once tried to learn ${userInterests[1] || 'photography'} in a single afternoon.`,
+          `We share 99% of our DNA with chimpanzees, but I still can't survive without coffee.`
+        ];
+      } else if (q.includes("heart")) {
+        return [
+          `A good coffee recipe and a list of recommended hikes to try.`,
+          `Sharing a passion for ${userInterests[0] || 'good travel spots'} and great music.`,
+          `Honest laughs, kind gestures, and an openness to explore new things.`
+        ];
+      } else {
+        return [
+          `Sharing ideas about ${userInterests[0] || 'music'} and starting new hobbies.`,
+          `A genuine smile, coffee mornings, and sharing a interest in ${userInterests[1] || 'adventures'}.`,
+          `Showing up with positive vibes and a curiosity to learn about what makes you smile.`
+        ];
+      }
+    }
+  };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    console.log("[AI Suggestions] ANTHROPIC_API_KEY not found. Using local rich fallback.");
+    return res.json({ success: true, suggestions: getOfflineSuggestions() });
+  }
+
+  // ── CALL ANTHROPIC API ──────────────────────────────────────────────────
+  try {
+    let systemPrompt = "";
+    let userPrompt = "";
+
+    if (type === 'bio') {
+      systemPrompt = "You are a dating profile writing assistant. Given a user's rough bio draft and interests, suggest 3 short, warm, specific, non-generic bio rewrites. Avoid clichés like adventure-seeker or foodie. Keep each under 150 characters. Return only the 3 suggestions as a JSON array of strings, nothing else.";
+      userPrompt = `Rough draft: "${userDraft}"\nInterests: ${userInterests.join(", ")}`;
+    } else {
+      systemPrompt = `You are a dating profile writing assistant. Given a user's rough answer to the prompt: "${promptQuestion || ''}" and their interests, suggest 3 short, warm, specific, non-generic prompt answer completions or rewrites. Keep each suggestion under 80 characters. Return only the 3 suggestions as a JSON array of strings, nothing else.`;
+      userPrompt = `Rough answer: "${userDraft}"\nInterests: ${userInterests.join(", ")}`;
+    }
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: 300,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }]
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn("[AI Suggestions] Anthropic API returned error response:", errorText);
+      throw new Error(`Anthropic status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.content?.[0]?.text;
+
+    if (!content) {
+      throw new Error("Empty assistant content");
+    }
+
+    // Attempt to extract JSON array
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    const rawJson = jsonMatch ? jsonMatch[0] : content;
+    const suggestions = JSON.parse(rawJson);
+
+    if (Array.isArray(suggestions)) {
+      return res.json({ success: true, suggestions: suggestions.map(s => s.trim().substring(0, type === 'bio' ? 150 : 80)) });
+    } else {
+      throw new Error("Parsed response is not an array");
+    }
+
+  } catch (err) {
+    console.warn("[AI Suggestions] Anthropic query failed, falling back to local:", err.message);
+    return res.json({ success: true, suggestions: getOfflineSuggestions() });
+  }
+}
+
+module.exports = { getCurrentUser, updateCurrentUser, getUser, updateUser, deleteUser, addPhoto, deletePhoto, reorderPhotos, updatePushToken, blockUser, unblockUser, getBlocks, reportUser, getAiSuggestions };

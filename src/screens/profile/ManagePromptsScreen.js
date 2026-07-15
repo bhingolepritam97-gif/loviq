@@ -4,7 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
+import AIBioSuggestions from '../../components/AIBioSuggestions';
 import { useAuth } from '../../context/AuthContext';
+import { fetchAiSuggestions } from '../../services/UserService';
 
 const PREDEFINED_QUESTIONS = [
   'A random fact I love is...',
@@ -30,6 +32,29 @@ export default function ManagePromptsScreen({ navigation }) {
   const [selectedQuestion, setSelectedQuestion] = useState('');
   const [replyText, setReplyText] = useState('');
   const [editingPromptId, setEditingPromptId] = useState(null);
+
+  // AI Suggestions state
+  const [aiSuggestionsVisible, setAiSuggestionsVisible] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+
+  const handleGetPromptSuggestions = async () => {
+    setAiSuggestionsVisible(true);
+    setAiLoading(true);
+    try {
+      const suggestions = await fetchAiSuggestions({
+        type: 'prompt',
+        text: replyText,
+        interests: profile?.interests || [],
+        promptQuestion: selectedQuestion
+      });
+      setAiSuggestions(suggestions);
+    } catch (err) {
+      console.warn('Failed to get prompt suggestions:', err);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const handleOpenAdd = () => {
     if (prompts.length >= 3) {
@@ -201,7 +226,17 @@ export default function ManagePromptsScreen({ navigation }) {
             </ScrollView>
 
             <View style={styles.replyBox}>
-              <Text style={styles.inputLabel}>Your Answer</Text>
+              <View style={styles.replyHeaderRow}>
+                <Text style={styles.inputLabel}>Your Answer</Text>
+                <TouchableOpacity
+                  id="add-prompt-ai-writer-btn"
+                  onPress={handleGetPromptSuggestions}
+                  style={styles.aiWriterBtn}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.aiWriterBtnText}>✨ Help me write</Text>
+                </TouchableOpacity>
+              </View>
               <TextInput
                 style={styles.replyInput}
                 placeholder="Write your answer..."
@@ -235,7 +270,17 @@ export default function ManagePromptsScreen({ navigation }) {
             </View>
 
             <View style={styles.replyBox}>
-              <Text style={styles.inputLabel}>Your Answer</Text>
+              <View style={styles.replyHeaderRow}>
+                <Text style={styles.inputLabel}>Your Answer</Text>
+                <TouchableOpacity
+                  id="edit-prompt-ai-writer-btn"
+                  onPress={handleGetPromptSuggestions}
+                  style={styles.aiWriterBtn}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.aiWriterBtnText}>✨ Help me write</Text>
+                </TouchableOpacity>
+              </View>
               <TextInput
                 style={styles.replyInput}
                 placeholder="Write your answer..."
@@ -252,6 +297,15 @@ export default function ManagePromptsScreen({ navigation }) {
         </View>
       </Modal>
 
+      {/* AI Writer bottom sheet */}
+      <AIBioSuggestions
+        visible={aiSuggestionsVisible}
+        onClose={() => setAiSuggestionsVisible(false)}
+        suggestions={aiSuggestions}
+        onSelect={(val) => setReplyText(val)}
+        loading={aiLoading}
+        type="prompt"
+      />
     </View>
   );
 }
@@ -311,4 +365,25 @@ const styles = StyleSheet.create({
   editQuestionBox: { marginBottom: Spacing.xl, backgroundColor: Colors.background, padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border },
   editQuestionLabel: { fontSize: 11, fontWeight: '800', color: Colors.primary, textTransform: 'uppercase', marginBottom: Spacing.xs },
   editQuestionText: { fontSize: 15, fontWeight: '800', color: Colors.text },
+
+  // AI suggestions button styles
+  replyHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  aiWriterBtn: {
+    backgroundColor: Colors.primary + '12',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
+  },
+  aiWriterBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
 });

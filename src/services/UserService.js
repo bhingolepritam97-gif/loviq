@@ -275,3 +275,16 @@ export const unmatchUser = async (myUid, matchId) => {
     return false;
   }
 };
+
+export const fetchAiSuggestions = async ({ type, text, interests, promptQuestion }) => {
+  try {
+    const response = await apiClient('/users/me/ai-suggestions', {
+      method: 'POST',
+      body: { type, text, interests, promptQuestion }
+    });
+    return response.success ? response.suggestions : [];
+  } catch (err) {
+    console.error('[UserService] Error fetching AI suggestions:', err);
+    return [];
+  }
+};

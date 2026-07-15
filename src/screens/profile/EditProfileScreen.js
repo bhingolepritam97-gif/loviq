@@ -6,8 +6,9 @@ import { Colors, Typography, Spacing, Radius, Shadow } from '../../theme';
 import Input from '../../components/Input';
 import VerifiedBadge from '../../components/VerifiedBadge';
 import ProfileScoreCard from '../../components/ProfileScoreCard';
+import AIBioSuggestions from '../../components/AIBioSuggestions';
 import { useAuth } from '../../context/AuthContext';
-import { updateUserProfile } from '../../services/UserService';
+import { updateUserProfile, fetchAiSuggestions } from '../../services/UserService';
 import { calculateProfileScore } from '../../utils/calculateProfileScore';
 import { Alert } from 'react-native';
 
@@ -32,6 +33,28 @@ export default function EditProfileScreen({ navigation, route }) {
   // Listen to updates from ManagePhotos and ManagePrompts screens
   const [photos, setPhotos] = useState(profile?.photos || []);
   const [prompts, setPrompts] = useState(profile?.prompts || []);
+
+  // AI Suggestions states
+  const [aiSuggestionsVisible, setAiSuggestionsVisible] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+
+  const handleGetBioSuggestions = async () => {
+    setAiSuggestionsVisible(true);
+    setAiLoading(true);
+    try {
+      const suggestions = await fetchAiSuggestions({
+        type: 'bio',
+        text: bio,
+        interests: profile?.interests || []
+      });
+      setAiSuggestions(suggestions);
+    } catch (err) {
+      console.warn('Failed to get bio suggestions:', err);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   useEffect(() => {
     // When returning from photo or prompt editing, reload the updated session states
@@ -204,6 +227,14 @@ export default function EditProfileScreen({ navigation, route }) {
               <Text style={styles.sectionEmoji}>📝</Text>
               <Text style={styles.sectionTitle}>BIO</Text>
             </View>
+            <TouchableOpacity
+              id="bio-ai-writer-btn"
+              onPress={handleGetBioSuggestions}
+              style={styles.aiWriterBtn}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.aiWriterBtnText}>✨ Help me write</Text>
+            </TouchableOpacity>
             <Text style={{ fontSize: 12, color: Colors.textMuted, fontWeight: '700' }}>
               {bio.length}/500
             </Text>
@@ -413,6 +444,16 @@ export default function EditProfileScreen({ navigation, route }) {
         </View>
 
       </ScrollView>
+
+      {/* AI Writer bottom sheet */}
+      <AIBioSuggestions
+        visible={aiSuggestionsVisible}
+        onClose={() => setAiSuggestionsVisible(false)}
+        suggestions={aiSuggestions}
+        onSelect={(val) => setBio(val)}
+        loading={aiLoading}
+        type="bio"
+      />
     </View>
   );
 }
@@ -498,4 +539,19 @@ const styles = StyleSheet.create({
   basicsGridPillActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '12' },
   basicsGridPillText: { fontSize: 12, color: Colors.text, fontWeight: '600' },
   basicsGridPillTextActive: { color: Colors.primary, fontWeight: '700' },
+
+  // AI suggestions button styles
+  aiWriterBtn: {
+    backgroundColor: Colors.primary + '12',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
+  },
+  aiWriterBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
 });
