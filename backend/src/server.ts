@@ -252,14 +252,14 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use("/users", usersRoutes);
-app.use("/deck", deckRoutes);
-app.use("/swipes", swipesRoutes);
-app.use("/matches", matchesRoutes);
-app.use("/admin", adminRoutes);
-app.use("/billing", billingRoutes);
-app.use("/safety", safetyRoutes);
-app.use("/prompts", promptsRoutes);
+['/users', '/api/users'].forEach(p => app.use(p, usersRoutes));
+['/deck', '/api/deck'].forEach(p => app.use(p, deckRoutes));
+['/swipes', '/api/swipes'].forEach(p => app.use(p, swipesRoutes));
+['/matches', '/api/matches'].forEach(p => app.use(p, matchesRoutes));
+['/admin', '/api/admin'].forEach(p => app.use(p, adminRoutes));
+['/billing', '/api/billing'].forEach(p => app.use(p, billingRoutes));
+['/safety', '/api/safety'].forEach(p => app.use(p, safetyRoutes));
+['/prompts', '/api/prompts'].forEach(p => app.use(p, promptsRoutes));
 
 // Central error handler
 app.use((err, req, res, next) => {
@@ -267,15 +267,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, error: "Internal server error" });
 });
 
-// Start background clean-up tasks ONLY in non-production/local environments.
-// Background cleanup is now handled by the /admin/run-cleaners endpoint,
-// triggered via a Kubernetes CronJob in all environments.
+if (require.main === module) {
+  const PORT = process.env.PORT || 4000;
+  server.listen(PORT, () => {
+    console.log(`lovly backend listening on :${PORT}`);
+  });
+}
 
-const PORT = process.env.PORT || 4000;
-
-server.listen(PORT, () => {
-  console.log(`lovly backend listening on :${PORT}`);
-});
+module.exports = app;
 
 // Graceful shutdown implementation
 const gracefulShutdown = (signal) => {

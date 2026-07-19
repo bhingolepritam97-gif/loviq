@@ -5,14 +5,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // In development, set EXPO_PUBLIC_API_URL in your .env file to your local IP (e.g. http://192.168.1.5:4000)
 const getBaseUrl = () => {
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
-  // If running on an HTTPS web deployment, avoid insecure http:// local IP URLs that trigger browser Mixed Content blocking
-  if (typeof window !== 'undefined' && window.location?.protocol === 'https:' && envUrl?.startsWith('http://')) {
-    return 'https://loviq-api.onrender.com';
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    // On web, if envUrl points to onrender or /api, use same-origin /api to avoid CORS entirely!
+    if (!envUrl || envUrl.includes('onrender.com') || envUrl === '/api') {
+      return `${window.location.origin}/api`;
+    }
   }
-  if (envUrl) {
-    return envUrl;
-  }
-  return 'https://loviq-api.onrender.com';
+  return envUrl || '/api';
 };
 
 const BASE_URL = getBaseUrl(); 
