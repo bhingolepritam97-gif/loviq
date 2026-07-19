@@ -83,23 +83,10 @@ export default function BasicInfoScreen({ navigation, route }) {
         end={{ x: 0.8, y: 1 }}
       />
       
-      {/* Header with Wordmark and Progress */}
+      {/* Header — title only, no back button, no progress bar */}
       <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressBarFill, { width: '33%' }]} />
-        </View>
         <View style={styles.headerRow}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            style={styles.backBtn}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="arrow-back" size={22} color={Colors.text} />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Lovly</Text>
-          <View style={{ width: 44 }} />
         </View>
       </View>
 
@@ -219,7 +206,6 @@ export default function BasicInfoScreen({ navigation, route }) {
                 <Text style={styles.continueButtonText}>CONTINUE</Text>
               </LinearGradient>
             </TouchableOpacity>
-            <Text style={styles.stepText}>Step 1 of 3</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

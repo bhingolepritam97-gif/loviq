@@ -1,0 +1,14 @@
+[
+  {
+    "origin": ["https://lovly-dating.vercel.app", "http://localhost:8081", "http://localhost:19006", "exp://localhost:8081"],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": [
+      "Content-Type",
+      "Authorization",
+      "Content-Length",
+      "X-Requested-With",
+      "x-goog-resumable"
+    ]
+  }
+]

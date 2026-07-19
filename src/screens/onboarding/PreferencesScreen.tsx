@@ -61,7 +61,7 @@ export default function PreferencesScreen({ navigation, route }) {
         end={{ x: 0.8, y: 1 }}
       />
       
-      {/* Header with Wordmark and Progress */}
+      {/* Header with Wordmark and back emoji */}
       <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
         <View style={styles.progressContainer}>
           <View style={[styles.progressBarFill, { width: '66%' }]} />
@@ -74,18 +74,10 @@ export default function PreferencesScreen({ navigation, route }) {
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+            <Text style={styles.backEmoji}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Lovly</Text>
-          <TouchableOpacity 
-            onPress={handleSkip} 
-            style={styles.skipBtn}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Skip preferences"
-          >
-            <Text style={styles.skipText}>SKIP</Text>
-          </TouchableOpacity>
+          <View style={{ width: 44 }} />
         </View>
       </View>
 
@@ -247,17 +239,10 @@ const createStyles = (Colors) => StyleSheet.create({
     fontFamily: Typography.fontFamily.serif,
     fontWeight: '700',
   },
-  skipBtn: {
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-  },
-  skipText: {
-    color: '#E8628F',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1,
+  backEmoji: {
+    fontSize: 22,
+    color: '#FFF0F3',
+    lineHeight: 26,
   },
   scrollContent: {
     flexGrow: 1,
