@@ -24,18 +24,10 @@ if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_AUTH === 'tr
 
 app.set('trust proxy', 1);
 
-// Enforce HTTPS in production
-if (process.env.NODE_ENV === "production") {
-  app.use((req, res, next) => {
-    if (req.headers["x-forwarded-proto"] !== "https") {
-      return res.redirect(`https://${req.headers.host}${req.url}`);
-    }
-    next();
-  });
-}
-
 app.use(helmet());
-app.use(cors({ origin: true, credentials: true }));
+const corsOptions = { origin: true, credentials: true };
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({
   limit: "1mb",
   verify: (req, res, buf) => {
