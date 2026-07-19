@@ -24,39 +24,28 @@ if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_AUTH === 'tr
 
 app.set('trust proxy', 1);
 
-app.use(helmet());
-const ALLOWED_ORIGINS = [
-  'https://lovly-dating.vercel.app',
-  'https://dist-zeta-two-29.vercel.app',
-  /\.vercel\.app$/,          // any Vercel preview deploy
-  /^http:\/\/localhost(:\d+)?$/, // any localhost port
-  /^exp:\/\//,               // Expo Go on device
-];
+// Bulletproof custom CORS middleware — intercepts preflight & headers for ALL origins and routes
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.setHeader('Access-Control-Exposed-Headers', 'X-RateLimit-Remaining');
+  res.setHeader('Access-Control-Max-Age', '86400');
 
-function isOriginAllowed(origin) {
-  if (!origin) return true; // non-browser / server-to-server
-  return ALLOWED_ORIGINS.some((o) =>
-    typeof o === 'string' ? o === origin : o.test(origin)
-  );
-}
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
 
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (isOriginAllowed(origin)) {
-      callback(null, true);
-    } else {
-      console.warn(`[CORS] Blocked origin: ${origin}`);
-      callback(new Error(`CORS: origin ${origin} not allowed`));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['X-RateLimit-Remaining'],
-  maxAge: 86400, // cache preflight for 24h
-};
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json({
   limit: "1mb",
   verify: (req, res, buf) => {
