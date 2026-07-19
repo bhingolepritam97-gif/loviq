@@ -16,6 +16,12 @@ const promptsRoutes = require("./routes/prompts");
 
 const app = express();
 
+// CRITICAL SECURITY GUARD: Prevent mock auth from ever reaching production
+if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_AUTH === 'true') {
+  console.error('FATAL: ALLOW_MOCK_AUTH cannot be true in production! Exiting immediately.');
+  process.exit(1);
+}
+
 app.set('trust proxy', 1);
 
 // Enforce HTTPS in production
