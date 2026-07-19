@@ -1,18 +1,16 @@
-// Bulletproof syncDb bridge — works before or after `tsc` compilation
 const path = require('path');
 const fs = require('fs');
 
-const compiledPath = path.join(__dirname, '../../dist/utils/syncDb.js');
+// Path to compiled TypeScript output
+const distPath = path.resolve(__dirname, '../../dist/utils/syncDb.js');
 
-if (fs.existsSync(compiledPath)) {
-  require(compiledPath);
-} else {
-  console.log('[syncDb.js] Compiled dist not found, running via ts-node...');
+if (fs.existsSync(distPath)) {
   try {
-    require('ts-node').register({ transpileOnly: true });
-    require('./syncDb.ts');
+    require(distPath);
   } catch (err) {
-    console.error('[syncDb.js] Could not run syncDb:', err.message);
-    process.exit(0); // exit 0 so build doesn't fail if optional sync fails
+    console.warn('[syncDb] Error executing dist/utils/syncDb.js:', err.message);
   }
+} else {
+  console.log('[syncDb] Skipping pre-build syncDb. Database syncs automatically when server starts.');
+  process.exit(0);
 }

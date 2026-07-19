@@ -272,6 +272,7 @@ app.use((err, req, res, next) => {
 // triggered via a Kubernetes CronJob in all environments.
 
 const PORT = process.env.PORT || 4000;
+
 server.listen(PORT, () => {
   console.log(`lovly backend listening on :${PORT}`);
 });
