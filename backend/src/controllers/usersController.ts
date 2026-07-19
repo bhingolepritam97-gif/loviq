@@ -926,4 +926,5 @@ async function appealSuspension(req, res) {
 
 module.exports = { checkProfileCompletion, getCurrentUser, updateCurrentUser, getUser, updateUser, deleteUser, addPhoto, deletePhoto, reorderPhotos, updatePushToken, blockUser, unblockUser, getBlocks, reportUser, getAiSuggestions, verifySelfie, generateInvite, getProfileScore, getAiPromptFeedback, travelToLocation, getMyAnalytics, appealSuspension };
 
+
 export {};

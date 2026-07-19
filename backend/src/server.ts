@@ -24,6 +24,14 @@ if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_AUTH === 'tr
 
 app.set('trust proxy', 1);
 
+// Normalize /api prefix for Vercel Serverless Functions
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api')) {
+    req.url = req.url.replace(/^\/api/, '') || '/';
+  }
+  next();
+});
+
 // Bulletproof custom CORS middleware — intercepts preflight & headers for ALL origins and routes
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -320,5 +328,6 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 module.exports = app;
+
 
 export {};

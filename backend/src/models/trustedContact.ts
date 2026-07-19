@@ -34,4 +34,5 @@ const TrustedContact = sequelize.define(
 
 module.exports = TrustedContact;
 
+
 export {};

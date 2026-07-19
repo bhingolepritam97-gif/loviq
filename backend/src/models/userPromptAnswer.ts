@@ -50,4 +50,5 @@ const UserPromptAnswer = sequelize.define(
 
 module.exports = UserPromptAnswer;
 
+
 export {};

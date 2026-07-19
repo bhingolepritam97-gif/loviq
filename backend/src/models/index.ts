@@ -61,4 +61,5 @@ UserPromptAnswer.belongsTo(Prompt, { foreignKey: "promptId", as: "prompt" });
 
 module.exports = { sequelize, User, Photo, Swipe, Match, Message, Block, Report, InviteCode, BannedIdentity, TrustedContact, DateShare, Config, Prompt, UserPromptAnswer };
 
+
 export {};

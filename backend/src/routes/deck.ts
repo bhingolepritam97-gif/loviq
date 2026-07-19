@@ -8,4 +8,5 @@ router.get("/top-picks", requireAuth, getTopPicks);
 
 module.exports = router;
 
+
 export {};

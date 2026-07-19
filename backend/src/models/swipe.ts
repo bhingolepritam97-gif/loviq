@@ -70,4 +70,5 @@ const Swipe = sequelize.define(
 
 module.exports = Swipe;
 
+
 export {};

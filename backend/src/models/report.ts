@@ -55,4 +55,5 @@ const Report = sequelize.define(
 
 module.exports = Report;
 
+
 export {};

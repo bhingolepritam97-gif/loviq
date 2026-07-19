@@ -47,4 +47,5 @@ const Block = sequelize.define(
 
 module.exports = Block;
 
+
 export {};

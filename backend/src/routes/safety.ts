@@ -16,4 +16,5 @@ router.get("/date/:id", safetyController.getDateShareContent);
 
 module.exports = router;
 
+
 export {};

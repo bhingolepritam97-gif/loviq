@@ -43,4 +43,5 @@ const DateShare = sequelize.define(
 
 module.exports = DateShare;
 
+
 export {};

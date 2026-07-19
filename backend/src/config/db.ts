@@ -9,17 +9,19 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-const sequelize = new Sequelize(process.env.DATABASE_URL, {
+const pg = require("pg");
+const dbUrl = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_yQS8pqjG4KWC@ep-crimson-lake-azq2cxhp-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
+
+const sequelize = new Sequelize(dbUrl, {
   dialect: "postgres",
+  dialectModule: pg,
   logging: process.env.NODE_ENV === "development" ? console.log : false,
   dialectOptions: {
-    ssl:
-      process.env.NODE_ENV === "production" || /neon\.tech/.test(process.env.DATABASE_URL || "")
-        ? { require: true, rejectUnauthorized: false }
-        : false,
+    ssl: { require: true, rejectUnauthorized: false },
   },
 });
 
 module.exports = sequelize;
+
 
 export {};

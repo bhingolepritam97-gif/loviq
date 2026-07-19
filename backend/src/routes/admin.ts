@@ -25,4 +25,5 @@ router.get("/analytics", ctrl.getAnalytics);
 
 module.exports = router;
 
+
 export {};

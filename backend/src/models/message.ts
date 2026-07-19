@@ -54,4 +54,5 @@ module.exports = (sequelize) => {
   return Message;
 };
 
+
 export {};

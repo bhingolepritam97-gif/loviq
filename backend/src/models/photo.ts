@@ -42,4 +42,5 @@ const Photo = sequelize.define(
 
 module.exports = Photo;
 
+
 export {};

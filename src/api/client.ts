@@ -21,14 +21,14 @@ const BASE_URL = getBaseUrl();
 export async function apiClient(endpoint: string, { method = 'GET', body, ...customConfig }: any = {}) {
   let token = '';
   try {
-    token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-    if (!token) {
-      // Fallback: check if mock session has stored a token in AsyncStorage
+    if (auth?.currentUser) {
+      token = await auth.currentUser.getIdToken();
+    } else {
       token = (await AsyncStorage.getItem('mock_user_token')) || '';
     }
   } catch (tokenErr) {
-    console.error('[apiClient] Token retrieval failed:', tokenErr.message);
-    throw new Error('Invalid or expired token');
+    console.warn('[apiClient] Unauthenticated request or token pending:', tokenErr.message);
+    token = '';
   }
   
   const headers = {

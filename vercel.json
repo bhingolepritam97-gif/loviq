@@ -1,4 +1,7 @@
 {
+  "framework": null,
+  "buildCommand": "cd backend && npm run build && cd .. && npx expo export --platform web --output-dir dist",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/:path*",

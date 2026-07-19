@@ -34,4 +34,5 @@ const BannedIdentity = sequelize.define(
 
 module.exports = BannedIdentity;
 
+
 export {};

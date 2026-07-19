@@ -76,4 +76,5 @@ const Match = sequelize.define(
 
 module.exports = Match;
 
+
 export {};

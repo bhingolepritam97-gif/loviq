@@ -37,4 +37,5 @@ const Prompt = sequelize.define(
 
 module.exports = Prompt;
 
+
 export {};

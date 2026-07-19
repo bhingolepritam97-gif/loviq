@@ -22,4 +22,5 @@ const Config = sequelize.define(
 
 module.exports = Config;
 
+
 export {};

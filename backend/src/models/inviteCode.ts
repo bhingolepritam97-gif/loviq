@@ -42,4 +42,5 @@ const InviteCode = sequelize.define(
 
 module.exports = InviteCode;
 
+
 export {};
