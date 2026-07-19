@@ -9,8 +9,8 @@
     "dev": "nodemon --exec ts-node src/server.ts",
     "test": "jest",
     "build": "tsc",
-    "db:sync": "node src/utils/syncDb.js",
-    "db:seed": "node src/utils/seed.js"
+    "db:sync": "node dist/utils/syncDb.js",
+    "db:seed": "node dist/utils/seed.js"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
