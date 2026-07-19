@@ -10,7 +10,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:627555697682:android:122e262129a9fc511784cb",
         "android_client_info": {
-          "package_name": "com.pritambhingole.vela"
+          "package_name": "com.pritambhingole.lovly"
         }
       },
       "oauth_client": [
@@ -18,7 +18,7 @@
           "client_id": "627555697682-kllje5kd534029ukgj2hbqeobj4da1jo.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.pritambhingole.vela",
+            "package_name": "com.pritambhingole.lovly",
             "certificate_hash": "0bd836ae6c4c4ba3602d3955fb288d7bb12377fd"
           }
         },
@@ -43,7 +43,7 @@
               "client_id": "627555697682-112h7ck44funs7o09jnm5h0nmn4pqs6u.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.pritambhingole.vela"
+                "bundle_id": "com.pritambhingole.lovly"
               }
             }
           ]

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Vela",
-    "slug": "loviq",
-    "scheme": "vela",
+    "name": "Lovly",
+    "slug": "lovly",
+    "scheme": "lovly",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,27 +10,28 @@
     "splash": {
       "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F5F0E8"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.pritambhingole.vela",
+      "bundleIdentifier": "com.pritambhingole.lovly",
       "googleServicesFile": "./GoogleService-Info.plist",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSUserNotificationUsageDescription": "Notifications help you receive new matches and messages.",
         "NSCameraUsageDescription": "Camera permission is required to capture verification selfies and make video calls.",
         "NSMicrophoneUsageDescription": "Microphone permission is required to connect your voice and video calls.",
-        "NSLocationWhenInUseUsageDescription": "Vela uses your location to find nearby matches and show approximate distances.",
-        "NSPhotoLibraryUsageDescription": "Vela requires access to your photo library to select and upload profile pictures.",
+        "NSLocationWhenInUseUsageDescription": "Lovly uses your location to find nearby matches and show approximate distances.",
+        "NSPhotoLibraryUsageDescription": "Lovly requires access to your photo library to select and upload profile pictures",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.pritambhingole.vela",
+      "package": "com.pritambhingole.lovly",
       "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#F5F0E8",
+        "backgroundColor": "#120A1C",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png"
       }
@@ -42,7 +43,8 @@
       "@react-native-firebase/auth",
       "@react-native-community/datetimepicker",
       "expo-web-browser",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-apple-authentication"
     ],
     "extra": {
       "eas": {

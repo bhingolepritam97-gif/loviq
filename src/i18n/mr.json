@@ -1,0 +1,42 @@
+{
+  "welcome": {
+    "title": "Lovly मध्ये आपले स्वागत आहे",
+    "subtitle": "समान आवडी आणि खऱ्या हेतूवर आधारित अर्थपूर्ण नातेसंबंध शोधा.",
+    "createAccount": "नवीन खाते तयार करा",
+    "signIn": "लॉग इन करा",
+    "terms": "नवीन खाते तयार करा किंवा लॉग इन करा वर टॅप करून, तुम्ही आमच्या सेवा अटी आणि गोपनीयता धोरणाशी सहमत आहात."
+  },
+  "phone": {
+    "title": "माझा नंबर आहे",
+    "subtitle": "आम्ही एक सत्यापन कोड पाठवू. संदेश आणि डेटा दर लागू होऊ शकतात.",
+    "continue": "पुढे जा",
+    "placeholder": "फोन नंबर",
+    "useEmail": "त्याऐवजी ईमेल वापरा"
+  },
+  "otp": {
+    "title": "तुमचा कोड प्रविष्ट करा",
+    "subtitle": "आम्ही %{contact} वर ६-अंकी कोड पाठवला आहे",
+    "resend": "कोड पुन्हा पाठवा",
+    "continue": "सत्यापित करा"
+  },
+  "settings": {
+    "title": "सेटिंग्ज",
+    "accountSettings": "खाते सेटिंग्ज",
+    "phoneNumber": "फोन नंबर",
+    "email": "ईमेल",
+    "notifications": "सूचना",
+    "pushNotifications": "पुश सूचना",
+    "appearance": "स्वरूप",
+    "darkMode": "डार्क मोड",
+    "language": "भाषा",
+    "privacySettings": "गोपनीयता सेटिंग्ज",
+    "showActiveStatus": "सक्रिय स्थिती दर्शवा",
+    "hideMyDistance": "माझे अंतर लपवा",
+    "pauseMyAccount": "माझे खाते विराम द्या",
+    "incognitoMode": "गुप्त मोड (प्रीमियम)",
+    "womenMessageFirst": "महिला प्रथम संदेश पाठवू शकतात",
+    "termsOfService": "सेवा अटी",
+    "logOut": "लॉग आउट करा",
+    "deleteAccount": "खाते हटवा"
+  }
+}

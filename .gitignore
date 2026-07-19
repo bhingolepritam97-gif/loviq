@@ -39,3 +39,11 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase config secrets
+google-services.json
+GoogleService-Info.plist
+.env
+backend/.env
+
+.vercel

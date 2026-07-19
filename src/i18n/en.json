@@ -1,0 +1,42 @@
+{
+  "welcome": {
+    "title": "Welcome to Lovly",
+    "subtitle": "Discover meaningful connections based on shared interests and genuine intent.",
+    "createAccount": "Create Account",
+    "signIn": "Sign In",
+    "terms": "By tapping Create Account or Sign In, you agree to our Terms of Service and Privacy Policy."
+  },
+  "phone": {
+    "title": "My number is",
+    "subtitle": "We'll send a text with a verification code. Message and data rates may apply.",
+    "continue": "Continue",
+    "placeholder": "Phone Number",
+    "useEmail": "Use Email Instead"
+  },
+  "otp": {
+    "title": "Enter your code",
+    "subtitle": "We sent a 6-digit code to %{contact}",
+    "resend": "Resend Code",
+    "continue": "Verify"
+  },
+  "settings": {
+    "title": "Settings",
+    "accountSettings": "Account Settings",
+    "phoneNumber": "Phone Number",
+    "email": "Email",
+    "notifications": "Notifications",
+    "pushNotifications": "Push Notifications",
+    "appearance": "Appearance",
+    "darkMode": "Dark Mode",
+    "language": "Language",
+    "privacySettings": "Privacy Settings",
+    "showActiveStatus": "Show Active Status",
+    "hideMyDistance": "Hide My Distance",
+    "pauseMyAccount": "Pause My Account",
+    "incognitoMode": "Incognito Mode (Premium)",
+    "womenMessageFirst": "Women Message First",
+    "termsOfService": "Terms of Service",
+    "logOut": "Log Out",
+    "deleteAccount": "Delete Account"
+  }
+}

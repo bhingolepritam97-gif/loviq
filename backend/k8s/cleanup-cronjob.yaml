@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: loviq-database-cleaner
+spec:
+  schedule: "*/30 * * * *"  # Runs every 30 minutes
+  concurrencyPolicy: Forbid  # Prevents overlapping runs if database locks hold execution
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: database-cleaner
+            image: loviq-backend:latest
+            imagePullPolicy: IfNotPresent
+            command: ["node", "src/utils/cleanup.js"]
+            env:
+            - name: NODE_ENV
+              value: "production"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: DATABASE_URL
+          restartPolicy: OnFailure

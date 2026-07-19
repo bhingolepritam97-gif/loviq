@@ -61,7 +61,18 @@ app.use("/billing", sensitiveLimiter);
 
 const http = require("http");
 const { Server } = require("socket.io");
-const { User, Match, Message } = require("./models");
+const { User, Match, Message, sequelize } = require("./models");
+
+// Run self-healing table migrations on startup to support women-first conversation model
+if (sequelize) {
+  sequelize.query(`
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS first_message_sender_id UUID;
+  `).catch(err => console.error("[migration] first_message_sender_id column failed:", err));
+
+  sequelize.query(`
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS chat_unlocked BOOLEAN DEFAULT FALSE;
+  `).catch(err => console.error("[migration] chat_unlocked column failed:", err));
+}
 
 const server = http.createServer(app);
 const io = new Server(server, {
