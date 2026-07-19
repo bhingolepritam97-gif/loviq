@@ -38,6 +38,9 @@ app.use(express.json({
 }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
+// Health endpoint registered BEFORE rate limiter so warm-up pings don't count against quota
+app.get("/health", (req, res) => res.json({ success: true, status: "ok" }));
+
 app.use(
   rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60_000,
@@ -58,15 +61,14 @@ const sensitiveLimiter = rateLimit({
 app.use("/admin", sensitiveLimiter);
 app.use("/billing", sensitiveLimiter);
 
-app.get("/health", (req, res) => res.json({ success: true, status: "ok" }));
-
 const http = require("http");
 const { Server } = require("socket.io");
 const { User, Match, Message } = require("./models");
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: ['lovly://', 'https://loviq-api.onrender.com'] }
+  // Allow all origins to match the REST API CORS policy (open during development/PWA phase)
+  cors: { origin: true, credentials: true }
 });
 
 if (process.env.REDIS_URL) {
