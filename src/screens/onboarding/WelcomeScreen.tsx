@@ -289,6 +289,21 @@ export default function WelcomeScreen({ navigation }) {
       <ResponsiveScreen scrollable={isPhone} backgroundColor="transparent">
         {isPhone ? (
           <View style={styles.mobileLayout}>
+            {/* Header with quick Log In button */}
+            <View style={styles.topHeaderRow}>
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity
+                style={styles.headerLoginBtn}
+                onPress={() => navigation.navigate('PhoneEmail', { isLogin: true })}
+                activeOpacity={0.8}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Log In"
+              >
+                <Text style={styles.headerLoginText}>LOG IN</Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Card stack area */}
             <Animated.View style={[styles.cardsArea, { opacity: fadeAnim }]}>
               <HeroCarousel cards={CARDS} autoplay={true} interval={5000} animationDuration={700} />
@@ -340,7 +355,18 @@ export default function WelcomeScreen({ navigation }) {
 
 const createStyles = (Colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#14051A' },
-  mobileLayout: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.xl },
+  mobileLayout: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md },
+
+  topHeaderRow: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingTop: Spacing.xs, paddingBottom: Spacing.xs },
+  headerLoginBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(232, 98, 143, 0.4)',
+    backgroundColor: 'rgba(232, 98, 143, 0.12)',
+  },
+  headerLoginText: { color: '#E8628F', fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: Typography.fontFamily.sansSerif },
   
   desktopLayout: { 
     flex: 1, 
