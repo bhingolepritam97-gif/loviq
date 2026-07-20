@@ -5,18 +5,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { Typography, Spacing, Radius, Shadow } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { auth } from '../../config/firebase';
+import { auth, db } from '../../config/firebase';
+import { doc, deleteDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { updateUserProfile, cancelSubscription } from '../../services/UserService';
+import { apiClient, clearApiCache } from '../../api/client';
+import { socketService } from '../../api/socket';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 import i18n from '../../i18n';
+import { ResponsiveContainer, useBreakpoints } from '../../core/responsive';
 
 export default function SettingsScreen({ navigation }) {
   const { colors: Colors, themeMode, setThemeMode, language, setLanguage } = useTheme();
   const styles = createStyles(Colors);
   const insets = useSafeAreaInsets();
-  const { profile, setProfile, user } = useAuth();
+  const { isPhone } = useBreakpoints();
+  const [activeSection, setActiveSection] = useState<'account' | 'notifications' | 'appearance' | 'privacy' | 'subscription' | 'matching' | 'about' | 'danger'>('account');
+  const { profile, setProfile, user, setUser } = useAuth();
   const [notifications, setNotifications] = useState(profile?.notificationsEnabled !== false);
   const [showActive, setShowActive] = useState(true);
   const [incognito, setIncognito] = useState(false);
@@ -88,24 +94,120 @@ export default function SettingsScreen({ navigation }) {
 
   const handleLogout = () => {
     Alert.alert(
-      "Log Out",
-      "Are you sure you want to log out of Lovly?",
+      "Logout",
+      "Are you sure you want to log out?",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Log Out", style: "destructive", onPress: async () => {
-          try {
-            setLoggingOut(true);
-            if (user) {
-              await AsyncStorage.removeItem(`profileComplete_${user.uid}`);
+        { 
+          text: "Logout", 
+          style: "destructive", 
+          onPress: async () => {
+            try {
+              setLoggingOut(true);
+              // Stop active socket listeners
+              socketService.disconnect();
+              
+              // Clear local onboarding status & temp data
+              if (user?.uid) {
+                await AsyncStorage.removeItem(`profileComplete_${user.uid}`);
+              }
+              await AsyncStorage.removeItem('mock_user_token');
+
+              // Clear user profile cache & all cached REST endpoints
+              await clearApiCache();
+
+              // Clear auth store & local state
+              setUser(null);
+              setProfile(null);
+
+              // Sign out from Firebase Authentication
+              await signOut(auth);
+              console.log('[SettingsScreen] ✅ Logout Success — user signed out and navigation reset to Welcome.');
+            } catch (err: any) {
+              console.error('[Logout] Logout error:', err);
+              Alert.alert('Error', 'Failed to log out. Please try again.');
+            } finally {
+              setLoggingOut(false);
             }
-            await signOut(auth);
-            // AuthContext will detect null user and redirect to Onboarding automatically
-          } catch (err) {
-            Alert.alert('Error', 'Failed to log out. Please try again.');
-          } finally {
-            setLoggingOut(false);
           }
-        }}
+        }
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Deleting your account is permanent. Your profile, photos, matches, chats, and messages will be permanently removed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete Account', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              setLoggingOut(true);
+              const currentUid = user?.uid;
+              const targetId = profile?.id || currentUid;
+
+              // 1. Stop active socket listeners
+              socketService.disconnect();
+
+              // 2. Delete Firestore document profiles/{uid}
+              if (currentUid && db) {
+                try {
+                  await deleteDoc(doc(db, 'profiles', currentUid));
+                  console.log('[DeleteAccount] Firestore profiles/' + currentUid + ' deleted.');
+                } catch (fsErr: any) {
+                  console.warn('[DeleteAccount] Firestore deletion warning:', fsErr.message);
+                }
+              }
+
+              // 3. Delete backend database user & related data (photos, matches, chats, messages, etc.)
+              if (targetId) {
+                try {
+                  await apiClient(`/users/${targetId}?hard=true`, { method: 'DELETE' });
+                  console.log('[DeleteAccount] Backend user data deleted for ID:', targetId);
+                } catch (apiErr: any) {
+                  console.warn('[DeleteAccount] Backend delete API warning:', apiErr.message);
+                }
+              }
+
+              // 4. Delete Firebase Authentication user
+              if (auth?.currentUser) {
+                try {
+                  await auth.currentUser.delete();
+                  console.log('[DeleteAccount] Firebase Auth account deleted successfully.');
+                } catch (authErr: any) {
+                  console.warn('[DeleteAccount] Firebase Auth delete warning:', authErr.message);
+                  if (authErr.code === 'auth/requires-recent-login') {
+                    Alert.alert('Re-authentication Required', 'Please log out and log back in before deleting your account.');
+                    setLoggingOut(false);
+                    return;
+                  }
+                }
+              }
+
+              // 5. Clear local storage, onboarding state & API cache
+              if (currentUid) {
+                await AsyncStorage.removeItem(`profileComplete_${currentUid}`);
+              }
+              await AsyncStorage.removeItem('mock_user_token');
+              await clearApiCache();
+
+              // 6. Clear auth store & local state (triggers AppNavigator to reset stack to Welcome/Signup)
+              setUser(null);
+              setProfile(null);
+
+              console.log('[SettingsScreen] ✅ Delete Success — account fully deleted. Redirected to Welcome.');
+            } catch (err: any) {
+              console.error('[DeleteAccount] Error deleting account:', err);
+              Alert.alert('Error', 'Failed to delete account. Please try again.');
+            } finally {
+              setLoggingOut(false);
+            }
+          }
+        }
       ]
     );
   };
@@ -152,7 +254,355 @@ export default function SettingsScreen({ navigation }) {
     navigation.navigate('BlockedContacts');
   };
 
+  const renderAccount = () => (
+    <View style={styles.sectionWrap}>
+      <Text style={styles.groupTitle}>{i18n.t('settings.accountSettings')}</Text>
+      <View style={styles.settingGroup}>
+        <View style={styles.settingItem}>
+          <View style={styles.itemLeft}>
+            <Ionicons name="call-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>{i18n.t('settings.phoneNumber')}</Text>
+          </View>
+          <Text style={styles.itemVal}>{auth?.currentUser?.phoneNumber || 'Not set'}</Text>
+        </View>
+        <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
+          <View style={styles.itemLeft}>
+            <Ionicons name="mail-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>{i18n.t('settings.email')}</Text>
+          </View>
+          <Text style={styles.itemVal} numberOfLines={1}>{auth?.currentUser?.email || 'Not set'}</Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderNotifications = () => (
+    <View style={styles.sectionWrap}>
+      <Text style={styles.groupTitle}>{i18n.t('settings.notifications')}</Text>
+      <View style={styles.settingGroup}>
+        <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
+          <View style={styles.itemLeft}>
+            <Ionicons name="notifications-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>{i18n.t('settings.pushNotifications')}</Text>
+          </View>
+          <Switch
+            value={notifications}
+            onValueChange={handleToggleNotifications}
+            trackColor={{ true: Colors.primary, false: Colors.border }}
+            thumbColor={Colors.white}
+          />
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderAppearance = () => (
+    <View style={styles.sectionWrap}>
+      <Text style={styles.groupTitle}>{i18n.t('settings.appearance')}</Text>
+      <View style={styles.settingGroup}>
+        <View style={styles.settingItem}>
+          <View style={styles.itemLeft}>
+            <Ionicons name="moon-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>{i18n.t('settings.darkMode')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity onPress={() => setThemeMode('light')} style={[styles.themeBtn, themeMode === 'light' && styles.themeBtnActive]}>
+              <Text style={[styles.themeBtnText, themeMode === 'light' && styles.themeBtnTextActive]}>Light</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setThemeMode('dark')} style={[styles.themeBtn, themeMode === 'dark' && styles.themeBtnActive]}>
+              <Text style={[styles.themeBtnText, themeMode === 'dark' && styles.themeBtnTextActive]}>Dark</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setThemeMode('system')} style={[styles.themeBtn, themeMode === 'system' && styles.themeBtnActive]}>
+              <Text style={[styles.themeBtnText, themeMode === 'system' && styles.themeBtnTextActive]}>System</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
+          <View style={styles.itemLeft}>
+            <Ionicons name="language-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>{i18n.t('settings.language')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity onPress={() => setLanguage('en')} style={[styles.themeBtn, language === 'en' && styles.themeBtnActive]}>
+              <Text style={[styles.themeBtnText, language === 'en' && styles.themeBtnTextActive]}>English</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setLanguage('mr')} style={[styles.themeBtn, language === 'mr' && styles.themeBtnActive]}>
+              <Text style={[styles.themeBtnText, language === 'mr' && styles.themeBtnTextActive]}>मराठी</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderPrivacy = () => (
+    <View style={styles.sectionWrap}>
+      <Text style={styles.groupTitle}>{i18n.t('settings.privacySettings')}</Text>
+      <View style={styles.settingGroup}>
+        <View style={styles.settingItem}>
+          <View style={styles.itemLeft}>
+            <Ionicons name="eye-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>{i18n.t('settings.showActiveStatus')}</Text>
+          </View>
+          <Switch
+            value={showActive}
+            onValueChange={setShowActive}
+            trackColor={{ true: Colors.primary, false: Colors.border }}
+            thumbColor={Colors.white}
+          />
+        </View>
+        <View style={styles.settingItem}>
+          <View style={styles.itemLeft}>
+            <Ionicons name="location-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>Hide My Distance</Text>
+          </View>
+          <Switch
+            value={hideDistance}
+            onValueChange={handleToggleHideDistance}
+            trackColor={{ true: Colors.primary, false: Colors.border }}
+            thumbColor={Colors.white}
+          />
+        </View>
+        <View style={styles.settingItem}>
+          <View style={styles.itemLeft}>
+            <Ionicons name="pause-circle-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>Pause My Account</Text>
+          </View>
+          <Switch
+            value={paused}
+            onValueChange={handleTogglePauseAccount}
+            trackColor={{ true: Colors.primary, false: Colors.border }}
+            thumbColor={Colors.white}
+          />
+        </View>
+        <View style={styles.settingItem}>
+          <View style={styles.itemLeft}>
+            <Ionicons name="glasses-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>Incognito Mode (Premium)</Text>
+          </View>
+          <Switch
+            value={incognito}
+            onValueChange={(val) => {
+              if (val) {
+                if (profile?.isPremium) {
+                  setIncognito(true);
+                  Alert.alert("Incognito Mode Active 🕵️", "Your profile is now hidden from new matches until you swipe on them.");
+                } else {
+                  navigation.navigate('Premium');
+                }
+              } else {
+                setIncognito(false);
+              }
+            }}
+            trackColor={{ true: Colors.primary, false: Colors.border }}
+            thumbColor={Colors.white}
+          />
+        </View>
+        <TouchableOpacity style={styles.settingItem} onPress={handleBlockList} accessible={true} accessibilityLabel="Blocked Contacts" accessibilityRole="button">
+          <View style={styles.itemLeft}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>Blocked Contacts</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.settingItem, { borderBottomWidth: 0 }]} onPress={() => navigation.navigate('Support')} accessible={true} accessibilityLabel="Help and Support" accessibilityRole="button">
+          <View style={styles.itemLeft}>
+            <Ionicons name="help-circle-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>Help & Support</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderSubscription = () => (
+    <View style={styles.sectionWrap}>
+      <Text style={styles.groupTitle}>Subscription</Text>
+      <View style={styles.settingGroup}>
+        <View style={styles.settingItem}>
+          <View style={styles.itemLeft}>
+            <Ionicons name="card-outline" size={20} color={Colors.primary} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>Current Plan</Text>
+          </View>
+          <Text style={[styles.itemVal, { fontWeight: '700', color: profile?.isPremium ? Colors.primary : Colors.textMuted }]}>
+            {profile?.isPremium ? 'Lovly Premium 👑' : (profile?.tier === 'plus' ? 'Lovly Plus ⭐' : 'Free Tier')}
+          </Text>
+        </View>
+        {(profile?.isPremium || (profile?.tier && profile?.tier !== 'free')) && (
+          <TouchableOpacity 
+            style={[styles.settingItem, { borderBottomWidth: 0 }]} 
+            onPress={handleCancelSub}
+            disabled={isCanceling}
+            accessible={true} accessibilityLabel="Cancel Subscription" accessibilityRole="button"
+          >
+            <View style={styles.itemLeft}>
+              <Ionicons name="close-circle-outline" size={20} color={Colors.error} style={styles.itemIcon} />
+              <Text style={[styles.itemLabel, { color: Colors.error }]}>Cancel Subscription</Text>
+            </View>
+            {isCanceling ? (
+              <ActivityIndicator size="small" color={Colors.error} />
+            ) : (
+              <Ionicons name="chevron-forward" size={20} color={Colors.error} />
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+
+  const renderMatching = () => {
+    if (!isWoman) return null;
+    return (
+      <View style={styles.sectionWrap}>
+        <Text style={styles.groupTitle}>Matching Preferences</Text>
+        <View style={styles.settingGroup}>
+          <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
+            <View style={[styles.itemLeft, { flex: 1, marginRight: 12 }]}>
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.primary} style={styles.itemIcon} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemLabel}>Women Message First</Text>
+                <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2, lineHeight: 15 }}>
+                  You get exclusive right to send the first message. Your match has 24 hrs to respond.
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={womenMessageFirst}
+              onValueChange={handleToggleWomenMessageFirst}
+              trackColor={{ true: Colors.primary, false: Colors.border }}
+              thumbColor={Colors.white}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderAbout = () => (
+    <View style={styles.sectionWrap}>
+      <Text style={styles.groupTitle}>About</Text>
+      <View style={styles.settingGroup}>
+        <TouchableOpacity 
+          style={styles.settingItem} 
+          onPress={handleOpenPrivacy}
+          accessible={true} accessibilityLabel="Privacy Policy" accessibilityRole="button"
+        >
+          <View style={styles.itemLeft}>
+            <Ionicons name="document-text-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>Privacy Policy</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.settingItem, { borderBottomWidth: 0 }]} 
+          onPress={handleOpenTerms}
+          accessible={true} accessibilityLabel="Terms of Service" accessibilityRole="button"
+        >
+          <View style={styles.itemLeft}>
+            <Ionicons name="document-text-outline" size={20} color={Colors.text} style={styles.itemIcon} />
+            <Text style={styles.itemLabel}>Terms of Service</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderDanger = () => (
+    <View style={styles.sectionWrap}>
+      <Text style={styles.groupTitle}>Danger Zone</Text>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} disabled={loggingOut} accessible={true} accessibilityLabel="Log Out" accessibilityRole="button">
+        {loggingOut
+          ? <ActivityIndicator color={Colors.primary} />
+          : <Text style={styles.logoutText}>{i18n.t('settings.logOut')}</Text>}
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.deleteButton} disabled={loggingOut} accessible={true} accessibilityLabel="Delete Account" accessibilityRole="button" onPress={handleDeleteAccount}>
+        <Text style={styles.deleteText}>{i18n.t('settings.deleteAccount')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderNavList = () => (
+    <View style={styles.navList}>
+      <TouchableOpacity 
+        style={[styles.navItem, activeSection === 'account' && styles.navItemActive]} 
+        onPress={() => setActiveSection('account')}
+      >
+        <Ionicons name="person-outline" size={18} color={activeSection === 'account' ? Colors.primary : Colors.text} />
+        <Text style={[styles.navItemText, activeSection === 'account' && styles.navItemTextActive]}>Account</Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[styles.navItem, activeSection === 'notifications' && styles.navItemActive]} 
+        onPress={() => setActiveSection('notifications')}
+      >
+        <Ionicons name="notifications-outline" size={18} color={activeSection === 'notifications' ? Colors.primary : Colors.text} />
+        <Text style={[styles.navItemText, activeSection === 'notifications' && styles.navItemTextActive]}>Notifications</Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[styles.navItem, activeSection === 'appearance' && styles.navItemActive]} 
+        onPress={() => setActiveSection('appearance')}
+      >
+        <Ionicons name="moon-outline" size={18} color={activeSection === 'appearance' ? Colors.primary : Colors.text} />
+        <Text style={[styles.navItemText, activeSection === 'appearance' && styles.navItemTextActive]}>Appearance</Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[styles.navItem, activeSection === 'privacy' && styles.navItemActive]} 
+        onPress={() => setActiveSection('privacy')}
+      >
+        <Ionicons name="eye-outline" size={18} color={activeSection === 'privacy' ? Colors.primary : Colors.text} />
+        <Text style={[styles.navItemText, activeSection === 'privacy' && styles.navItemTextActive]}>Privacy & Support</Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[styles.navItem, activeSection === 'subscription' && styles.navItemActive]} 
+        onPress={() => setActiveSection('subscription')}
+      >
+        <Ionicons name="card-outline" size={18} color={activeSection === 'subscription' ? Colors.primary : Colors.text} />
+        <Text style={[styles.navItemText, activeSection === 'subscription' && styles.navItemTextActive]}>Subscription</Text>
+      </TouchableOpacity>
+      {isWoman && (
+        <TouchableOpacity 
+          style={[styles.navItem, activeSection === 'matching' && styles.navItemActive]} 
+          onPress={() => setActiveSection('matching')}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color={activeSection === 'matching' ? Colors.primary : Colors.text} />
+          <Text style={[styles.navItemText, activeSection === 'matching' && styles.navItemTextActive]}>Matching</Text>
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity 
+        style={[styles.navItem, activeSection === 'about' && styles.navItemActive]} 
+        onPress={() => setActiveSection('about')}
+      >
+        <Ionicons name="document-text-outline" size={18} color={activeSection === 'about' ? Colors.primary : Colors.text} />
+        <Text style={[styles.navItemText, activeSection === 'about' && styles.navItemTextActive]}>About & Legal</Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[styles.navItem, activeSection === 'danger' && styles.navItemActive]} 
+        onPress={() => setActiveSection('danger')}
+      >
+        <Ionicons name="alert-circle-outline" size={18} color={activeSection === 'danger' ? Colors.primary : Colors.text} />
+        <Text style={[styles.navItemText, activeSection === 'danger' && styles.navItemTextActive]}>Danger Zone</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderActiveSection = () => {
+    switch (activeSection) {
+      case 'account': return renderAccount();
+      case 'notifications': return renderNotifications();
+      case 'appearance': return renderAppearance();
+      case 'privacy': return renderPrivacy();
+      case 'subscription': return renderSubscription();
+      case 'matching': return renderMatching();
+      case 'about': return renderAbout();
+      case 'danger': return renderDanger();
+      default: return renderAccount();
+    }
+  };
+
   return (
+    <ResponsiveContainer safeArea={false}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
@@ -163,270 +613,29 @@ export default function SettingsScreen({ navigation }) {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Account Settings */}
-        <Text style={styles.groupTitle}>{i18n.t('settings.accountSettings')}</Text>
-        <View style={styles.settingGroup}>
-          <View style={styles.settingItem}>
-            <View style={styles.itemLeft}>
-              <Ionicons name="call-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>{i18n.t('settings.phoneNumber')}</Text>
-            </View>
-            <Text style={styles.itemVal}>{auth?.currentUser?.phoneNumber || 'Not set'}</Text>
+      {isPhone ? (
+        <ScrollView contentContainerStyle={styles.scroll}>
+          {renderAccount()}
+          {renderNotifications()}
+          {renderAppearance()}
+          {renderPrivacy()}
+          {renderSubscription()}
+          {renderMatching()}
+          {renderAbout()}
+          {renderDanger()}
+        </ScrollView>
+      ) : (
+        <View style={styles.splitWrapper}>
+          <View style={styles.leftPane}>
+            {renderNavList()}
           </View>
-          <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
-            <View style={styles.itemLeft}>
-              <Ionicons name="mail-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>{i18n.t('settings.email')}</Text>
-            </View>
-            <Text style={styles.itemVal} numberOfLines={1}>{auth?.currentUser?.email || 'Not set'}</Text>
-          </View>
+          <ScrollView style={styles.rightPane} contentContainerStyle={styles.detailScroll}>
+            {renderActiveSection()}
+          </ScrollView>
         </View>
-
-        {/* Notifications */}
-        <Text style={styles.groupTitle}>{i18n.t('settings.notifications')}</Text>
-        <View style={styles.settingGroup}>
-          <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
-            <View style={styles.itemLeft}>
-              <Ionicons name="notifications-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>{i18n.t('settings.pushNotifications')}</Text>
-            </View>
-            <Switch
-              value={notifications}
-              onValueChange={handleToggleNotifications}
-              trackColor={{ true: Colors.primary, false: Colors.border }}
-              thumbColor={Colors.white}
-            />
-          </View>
-        </View>
-
-        {/* Appearance Settings */}
-        <Text style={styles.groupTitle}>{i18n.t('settings.appearance')}</Text>
-        <View style={styles.settingGroup}>
-          <View style={styles.settingItem}>
-            <View style={styles.itemLeft}>
-              <Ionicons name="moon-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>{i18n.t('settings.darkMode')}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity onPress={() => setThemeMode('light')} style={[styles.themeBtn, themeMode === 'light' && styles.themeBtnActive]}>
-                <Text style={[styles.themeBtnText, themeMode === 'light' && styles.themeBtnTextActive]}>Light</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setThemeMode('dark')} style={[styles.themeBtn, themeMode === 'dark' && styles.themeBtnActive]}>
-                <Text style={[styles.themeBtnText, themeMode === 'dark' && styles.themeBtnTextActive]}>Dark</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setThemeMode('system')} style={[styles.themeBtn, themeMode === 'system' && styles.themeBtnActive]}>
-                <Text style={[styles.themeBtnText, themeMode === 'system' && styles.themeBtnTextActive]}>System</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
-            <View style={styles.itemLeft}>
-              <Ionicons name="language-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>{i18n.t('settings.language')}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity onPress={() => setLanguage('en')} style={[styles.themeBtn, language === 'en' && styles.themeBtnActive]}>
-                <Text style={[styles.themeBtnText, language === 'en' && styles.themeBtnTextActive]}>English</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setLanguage('mr')} style={[styles.themeBtn, language === 'mr' && styles.themeBtnActive]}>
-                <Text style={[styles.themeBtnText, language === 'mr' && styles.themeBtnTextActive]}>मराठी</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {/* Privacy Settings */}
-        <Text style={styles.groupTitle}>{i18n.t('settings.privacySettings')}</Text>
-        <View style={styles.settingGroup}>
-          <View style={styles.settingItem}>
-            <View style={styles.itemLeft}>
-              <Ionicons name="eye-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>{i18n.t('settings.showActiveStatus')}</Text>
-            </View>
-            <Switch
-              value={showActive}
-              onValueChange={setShowActive}
-              trackColor={{ true: Colors.primary, false: Colors.border }}
-              thumbColor={Colors.white}
-            />
-          </View>
-          <View style={styles.settingItem}>
-            <View style={styles.itemLeft}>
-              <Ionicons name="location-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>Hide My Distance</Text>
-            </View>
-            <Switch
-              value={hideDistance}
-              onValueChange={handleToggleHideDistance}
-              trackColor={{ true: Colors.primary, false: Colors.border }}
-              thumbColor={Colors.white}
-            />
-          </View>
-          <View style={styles.settingItem}>
-            <View style={styles.itemLeft}>
-              <Ionicons name="pause-circle-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>Pause My Account</Text>
-            </View>
-            <Switch
-              value={paused}
-              onValueChange={handleTogglePauseAccount}
-              trackColor={{ true: Colors.primary, false: Colors.border }}
-              thumbColor={Colors.white}
-            />
-          </View>
-          <View style={styles.settingItem}>
-            <View style={styles.itemLeft}>
-              <Ionicons name="glasses-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>Incognito Mode (Premium)</Text>
-            </View>
-            <Switch
-              value={incognito}
-              onValueChange={(val) => {
-                if (val) {
-                  if (profile?.isPremium) {
-                    setIncognito(true);
-                    Alert.alert("Incognito Mode Active 🕵️", "Your profile is now hidden from new matches until you swipe on them.");
-                  } else {
-                    navigation.navigate('Premium');
-                  }
-                } else {
-                  setIncognito(false);
-                }
-              }}
-              trackColor={{ true: Colors.primary, false: Colors.border }}
-              thumbColor={Colors.white}
-            />
-          </View>
-          <TouchableOpacity style={styles.settingItem} onPress={handleBlockList} accessible={true} accessibilityLabel="Blocked Contacts" accessibilityRole="button">
-            <View style={styles.itemLeft}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>Blocked Contacts</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.settingItem, { borderBottomWidth: 0 }]} onPress={() => navigation.navigate('Support')} accessible={true} accessibilityLabel="Help and Support" accessibilityRole="button">
-            <View style={styles.itemLeft}>
-              <Ionicons name="help-circle-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>Help & Support</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Subscription Settings */}
-        <Text style={styles.groupTitle}>Subscription</Text>
-        <View style={styles.settingGroup}>
-          <View style={styles.settingItem}>
-            <View style={styles.itemLeft}>
-              <Ionicons name="card-outline" size={20} color={Colors.primary} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>Current Plan</Text>
-            </View>
-            <Text style={[styles.itemVal, { fontWeight: '700', color: profile?.isPremium ? Colors.primary : Colors.textMuted }]}>
-              {profile?.isPremium ? 'Lovly Premium 👑' : (profile?.tier === 'plus' ? 'Lovly Plus ⭐' : 'Free Tier')}
-            </Text>
-          </View>
-          {(profile?.isPremium || (profile?.tier && profile?.tier !== 'free')) && (
-            <TouchableOpacity 
-              style={[styles.settingItem, { borderBottomWidth: 0 }]} 
-              onPress={handleCancelSub}
-              disabled={isCanceling}
-              accessible={true} accessibilityLabel="Cancel Subscription" accessibilityRole="button"
-            >
-              <View style={styles.itemLeft}>
-                <Ionicons name="close-circle-outline" size={20} color={Colors.error} style={styles.itemIcon} />
-                <Text style={[styles.itemLabel, { color: Colors.error }]}>Cancel Subscription</Text>
-              </View>
-              {isCanceling ? (
-                <ActivityIndicator size="small" color={Colors.error} />
-              ) : (
-                <Ionicons name="chevron-forward" size={20} color={Colors.error} />
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Women Message First - only shown to women */}
-        {isWoman && (
-          <>
-            <Text style={styles.groupTitle}>Matching Preferences</Text>
-            <View style={styles.settingGroup}>
-              <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
-                <View style={[styles.itemLeft, { flex: 1, marginRight: 12 }]}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.primary} style={styles.itemIcon} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.itemLabel}>Women Message First</Text>
-                    <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2, lineHeight: 15 }}>
-                      You get exclusive right to send the first message. Your match has 24 hrs to respond.
-                    </Text>
-                  </View>
-                </View>
-                <Switch
-                  value={womenMessageFirst}
-                  onValueChange={handleToggleWomenMessageFirst}
-                  trackColor={{ true: Colors.primary, false: Colors.border }}
-                  thumbColor={Colors.white}
-                />
-              </View>
-            </View>
-          </>
-        )}
-
-        {/* About & Legal */}
-        <Text style={styles.groupTitle}>About</Text>
-        <View style={styles.settingGroup}>
-          <TouchableOpacity 
-            style={styles.settingItem} 
-            onPress={handleOpenPrivacy}
-            accessible={true} accessibilityLabel="Privacy Policy" accessibilityRole="button"
-          >
-            <View style={styles.itemLeft}>
-              <Ionicons name="document-text-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>Privacy Policy</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.settingItem, { borderBottomWidth: 0 }]} 
-            onPress={handleOpenTerms}
-            accessible={true} accessibilityLabel="Terms of Service" accessibilityRole="button"
-          >
-            <View style={styles.itemLeft}>
-              <Ionicons name="document-text-outline" size={20} color={Colors.text} style={styles.itemIcon} />
-              <Text style={styles.itemLabel}>Terms of Service</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Danger Zone */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} disabled={loggingOut} accessible={true} accessibilityLabel="Log Out" accessibilityRole="button">
-          {loggingOut
-            ? <ActivityIndicator color={Colors.primary} />
-            : <Text style={styles.logoutText}>{i18n.t('settings.logOut')}</Text>}
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.deleteButton} accessible={true} accessibilityLabel="Delete Account" accessibilityRole="button" onPress={() => Alert.alert(
-          'Delete Account',
-          'This will permanently delete your account and all your data. This cannot be undone.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: async () => {
-              try {
-                if (user) {
-                  await AsyncStorage.removeItem(`profileComplete_${user.uid}`);
-                }
-                await auth?.currentUser?.delete();
-              } catch (err) {
-                Alert.alert('Error', 'Please log out and log back in before deleting your account.');
-              }
-            }}
-          ]
-        )}>
-          <Text style={styles.deleteText}>{i18n.t('settings.deleteAccount')}</Text>
-        </TouchableOpacity>
-      </ScrollView>
+      )}
     </View>
+    </ResponsiveContainer>
   );
 }
 
@@ -451,4 +660,14 @@ const createStyles = (Colors) => StyleSheet.create({
   logoutText: { color: Colors.primary, fontWeight: '700', fontSize: 16 },
   deleteButton: { paddingVertical: Spacing.md, alignItems: 'center', marginTop: Spacing.md },
   deleteText: { color: Colors.error, fontSize: Typography.fontSize.sm, fontWeight: '600' },
+  splitWrapper: { flex: 1, flexDirection: 'row', backgroundColor: Colors.background },
+  leftPane: { width: 280, borderRightWidth: 1, borderRightColor: Colors.border, padding: Spacing.xl },
+  rightPane: { flex: 1, backgroundColor: Colors.background },
+  navList: { gap: Spacing.sm },
+  navItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderRadius: Radius.md, gap: Spacing.md },
+  navItemActive: { backgroundColor: Colors.primary + '12' },
+  navItemText: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  navItemTextActive: { color: Colors.primary, fontWeight: '700' },
+  sectionWrap: { padding: Spacing.xl },
+  detailScroll: { paddingBottom: 100 },
 });

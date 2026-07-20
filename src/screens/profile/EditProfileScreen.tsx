@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { updateUserProfile, fetchAiSuggestions } from '../../services/UserService';
 import { calculateProfileScore } from '../../utils/calculateProfileScore';
 import { Alert } from 'react-native';
+import { ResponsiveContainer } from '../../core/responsive';
 
 export default function EditProfileScreen({ navigation, route }) {
   const { colors: Colors } = useTheme();
@@ -122,6 +123,7 @@ export default function EditProfileScreen({ navigation, route }) {
   };
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
@@ -542,6 +544,7 @@ export default function EditProfileScreen({ navigation, route }) {
         type="bio"
       />
     </View>
+    </ResponsiveContainer>
   );
 }
 

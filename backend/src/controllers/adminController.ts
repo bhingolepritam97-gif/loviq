@@ -481,6 +481,70 @@ async function getAnalytics(req, res) {
   }
 }
 
+// GET /admin/moderation-logs
+async function getModerationLogs(req, res) {
+  const check = verifyAdminKey(req);
+  if (!check.valid) return res.status(check.status).json({ success: false, error: check.error });
+
+  const { ModerationLog } = require("../models");
+  try {
+    const logs = await ModerationLog.findAll({
+      order: [["createdAt", "DESC"]],
+      limit: 100
+    });
+    res.json({ success: true, logs });
+  } catch (err) {
+    console.error("[adminController] getModerationLogs error:", err);
+    res.status(500).json({ success: false, error: "Failed to fetch logs." });
+  }
+}
+
+// POST /admin/users/:id/shadow-ban
+async function shadowBanUser(req, res) {
+  const check = verifyAdminKey(req);
+  if (!check.valid) return res.status(check.status).json({ success: false, error: check.error });
+
+  const userId = req.params.id;
+  const { action } = req.body; // 'apply' or 'lift'
+  const { User, ModerationLog } = require("../models");
+
+  try {
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ success: false, error: "User not found." });
+
+    if (action === "apply") {
+      await user.update({ isShadowBanned: true, shadowBannedAt: new Date() });
+      await ModerationLog.create({ userId, actionType: "shadow_ban", reason: "Manual admin action." });
+    } else {
+      await user.update({ isShadowBanned: false, shadowBannedAt: null });
+      await ModerationLog.create({ userId, actionType: "lift_shadow_ban", reason: "Manual admin action." });
+    }
+
+    res.json({ success: true, message: `Shadow ban ${action}ed.` });
+  } catch (err) {
+    console.error("[adminController] shadowBanUser error:", err);
+    res.status(500).json({ success: false, error: "Failed to apply shadow ban." });
+  }
+}
+
+// POST /admin/users/:id/strike
+async function issueStrike(req, res) {
+  const check = verifyAdminKey(req);
+  if (!check.valid) return res.status(check.status).json({ success: false, error: check.error });
+
+  const userId = req.params.id;
+  const { reason, weight } = req.body;
+  const safetyService = require("../services/safetyService");
+
+  try {
+    await safetyService.applyStrike(userId, reason || "Manual admin strike.", weight || 1, 1.0);
+    res.json({ success: true, message: "Strike issued successfully." });
+  } catch (err) {
+    console.error("[adminController] issueStrike error:", err);
+    res.status(500).json({ success: false, error: "Failed to issue strike." });
+  }
+}
+
 module.exports = { 
   seedInviteCodes,
   getPendingVerifications,
@@ -492,7 +556,10 @@ module.exports = {
   getAppeals,
   resolveAppeal,
   runCleaners,
-  getAnalytics
+  getAnalytics,
+  getModerationLogs,
+  shadowBanUser,
+  issueStrike
 };
 
 

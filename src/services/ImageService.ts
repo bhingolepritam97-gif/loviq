@@ -30,27 +30,45 @@ export const takePhotoWithCamera = async () => {
   return await ImagePicker.launchCameraAsync(options);
 };
 
-export const uploadImageToFirebase = async (uri) => {
-  const { storage, isConfigured } = require('../config/firebase');
-  const { ref, uploadBytes, getDownloadURL } = require('firebase/storage');
+export const uploadImageToFirebase = async (uri: string) => {
+  if (!uri) return uri;
 
-  if (!isConfigured) {
-    console.warn("Firebase not configured. Returning local URI as fallback.");
-    return uri;
+  // On Web, convert blob/file directly to Base64 data URI to avoid CORS restrictions on Firebase Storage
+  if (Platform.OS === 'web' || uri.startsWith('data:image')) {
+    if (uri.startsWith('data:image')) return uri;
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      return await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(uri);
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.warn('[ImageService] Web base64 conversion fallback:', err.message);
+      return uri;
+    }
   }
 
+  // Native Mobile Firebase Storage Upload
   try {
-    const filename = `photo_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-    const storageRef = ref(storage, `profiles/${filename}`);
+    const { storage, isConfigured } = require('../config/firebase');
+    const { ref, uploadBytes, getDownloadURL } = require('firebase/storage');
 
-    const response = await fetch(uri);
-    const blob = await response.blob();
+    if (isConfigured) {
+      const filename = `photo_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+      const storageRef = ref(storage, `profiles/${filename}`);
 
-    await uploadBytes(storageRef, blob);
-    const downloadURL = await getDownloadURL(storageRef);
-    return downloadURL;
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      await uploadBytes(storageRef, blob);
+      return await getDownloadURL(storageRef);
+    }
   } catch (error) {
-    console.warn("Error uploading image to Firebase Storage:", error.message);
-    throw error;
+    console.warn('[ImageService] Firebase Storage upload error:', error.message);
   }
+
+  return uri;
 };

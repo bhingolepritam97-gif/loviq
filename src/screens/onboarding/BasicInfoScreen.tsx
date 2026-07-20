@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { trackOnboardingStep, trackOnboardingStepCompleted } from '../../utils/onboardingAnalytics';
 import { Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ResponsiveContainer, ResponsiveScreen, useBreakpoints } from '../../core/responsive';
 
 const GENDERS = ['Woman', 'Man', 'Non-binary'];
 
@@ -18,6 +19,7 @@ export default function BasicInfoScreen({ navigation, route }) {
   const [dobInput, setDobInput] = useState('');
   const [gender, setGender] = useState(null);
   const startTime = useRef(Date.now());
+  const { isPhone } = useBreakpoints();
 
   const formatDob = (val) => {
     const clean = val.replace(/\D/g, '');
@@ -66,10 +68,15 @@ export default function BasicInfoScreen({ navigation, route }) {
 
   const handleContinue = () => {
     trackOnboardingStepCompleted('basic_info', Date.now() - startTime.current);
+    const yyyy = birthday.getFullYear();
+    const mm = String(birthday.getMonth() + 1).padStart(2, '0');
+    const dd = String(birthday.getDate()).padStart(2, '0');
+    const birthdayFormatted = `${yyyy}-${mm}-${dd}`;
+    console.log('[BasicInfoScreen] Navigating with birthday:', birthdayFormatted, 'name:', name.trim(), 'gender:', gender);
     navigation.navigate('Preferences', {
       ...route.params,
       name: name.trim(),
-      birthday: birthday.toISOString(),
+      birthday: birthdayFormatted,
       gender,
     });
   };
@@ -83,104 +90,97 @@ export default function BasicInfoScreen({ navigation, route }) {
         end={{ x: 0.8, y: 1 }}
       />
       
-      {/* Header — title only, no back button, no progress bar */}
-      <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Lovly</Text>
+      <ResponsiveScreen keyboardAvoiding scrollable backgroundColor="transparent">
+        {/* Header — title only, no back button, no progress bar */}
+        <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
+          <View style={styles.headerRow}>
+            <Text style={styles.headerTitle}>Lovly</Text>
+          </View>
         </View>
-      </View>
 
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView 
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.mainWrapper}>
-            <Text style={styles.title}>The basics</Text>
-            <Text style={styles.subtitle}>
-              Tell us a little about yourself to help us find your perfect match.
-            </Text>
+        {/* Inner Form with Desktop support */}
+        <View style={styles.innerForm}>
+          <Text style={styles.title}>The basics</Text>
+          <Text style={styles.subtitle}>
+            Tell us a little about yourself to help us find your perfect match.
+          </Text>
 
-            {/* Input Form */}
-            <View style={styles.formContainer}>
-              {/* Name */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.fieldLabel}>FIRST NAME</Text>
+          {/* Input Form */}
+          <View style={styles.formContainer}>
+            {/* Name */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.fieldLabel}>FIRST NAME</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Enter your name"
+                placeholderTextColor="#7A667A"
+                value={name}
+                onChangeText={setName}
+                autoFocus
+                selectionColor="#E8628F"
+                accessible={true}
+                accessibilityLabel="First name input field"
+                accessibilityHint="Enter your first name to display on your profile."
+              />
+            </View>
+
+            {/* Birthday */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.fieldLabel}>BIRTHDAY</Text>
+              <View style={styles.dobInputWrapper}>
                 <TextInput
-                  style={styles.textInput}
-                  placeholder="Enter your name"
+                  style={styles.dobTextInput}
+                  placeholder="DD / MM / YYYY"
                   placeholderTextColor="#7A667A"
-                  value={name}
-                  onChangeText={setName}
-                  autoFocus
+                  value={dobInput}
+                  onChangeText={text => setDobInput(formatDob(text))}
+                  keyboardType="number-pad"
+                  maxLength={10}
                   selectionColor="#E8628F"
                   accessible={true}
-                  accessibilityLabel="First name input field"
-                  accessibilityHint="Enter your first name to display on your profile."
+                  accessibilityLabel="Birthday input field"
+                  accessibilityHint="Type your birth date in day month year format."
                 />
+                <Ionicons name="calendar-outline" size={20} color="#E8628F" style={styles.calendarIcon} />
               </View>
+              {birthday && (
+                <Text style={styles.infoText}>Calculated Age: {age} years old</Text>
+              )}
+              {dobInput.length === 10 && !birthday && (
+                <Text style={styles.errorText} accessibilityLiveRegion="assertive">
+                  Please enter a valid date (DD/MM/YYYY).
+                </Text>
+              )}
+              {age !== null && age < 18 && (
+                <Text style={styles.errorText} accessibilityLiveRegion="assertive">
+                  You must be 18+ to use Lovly.
+                </Text>
+              )}
+            </View>
 
-              {/* Birthday */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.fieldLabel}>BIRTHDAY</Text>
-                <View style={styles.dobInputWrapper}>
-                  <TextInput
-                    style={styles.dobTextInput}
-                    placeholder="DD / MM / YYYY"
-                    placeholderTextColor="#7A667A"
-                    value={dobInput}
-                    onChangeText={text => setDobInput(formatDob(text))}
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    selectionColor="#E8628F"
-                    accessible={true}
-                    accessibilityLabel="Birthday input field"
-                    accessibilityHint="Type your birth date in day month year format."
-                  />
-                  <Ionicons name="calendar-outline" size={20} color="#E8628F" style={styles.calendarIcon} />
-                </View>
-                {birthday && (
-                  <Text style={styles.infoText}>Calculated Age: {age} years old</Text>
-                )}
-                {dobInput.length === 10 && !birthday && (
-                  <Text style={styles.errorText} accessibilityLiveRegion="assertive">
-                    Please enter a valid date (DD/MM/YYYY).
-                  </Text>
-                )}
-                {age !== null && age < 18 && (
-                  <Text style={styles.errorText} accessibilityLiveRegion="assertive">
-                    You must be 18+ to use Lovly.
-                  </Text>
-                )}
-              </View>
-
-              {/* Gender selection */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.fieldLabel}>I AM A</Text>
-                <View style={styles.pillRow} accessible={false}>
-                  {GENDERS.map((g) => {
-                    const isSelected = gender === g;
-                    return (
-                      <TouchableOpacity
-                        key={g}
-                        style={[styles.pill, isSelected && styles.pillSelected]}
-                        onPress={() => setGender(g)}
-                        accessible={true}
-                        accessibilityRole="checkbox"
-                        accessibilityState={{ checked: isSelected }}
-                        accessibilityLabel={`Gender option: ${g}`}
-                      >
-                        <Text style={[styles.pillText, isSelected && styles.pillTextSelected]}>
-                          {g}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+            {/* Gender selection */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.fieldLabel}>I AM A</Text>
+              <View style={styles.pillRow} accessible={false}>
+                {GENDERS.map((g) => {
+                  const isSelected = gender === g;
+                  return (
+                    <TouchableOpacity
+                      key={g}
+                      style={[styles.pill, isSelected && styles.pillSelected]}
+                      onPress={() => setGender(g)}
+                      accessible={true}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: isSelected }}
+                      accessibilityLabel={`Gender option: ${g}`}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.pillText, isSelected && styles.pillTextSelected]}>
+                        {g}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           </View>
@@ -207,8 +207,8 @@ export default function BasicInfoScreen({ navigation, route }) {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </View>
+      </ResponsiveScreen>
     </View>
   );
 }
@@ -222,30 +222,15 @@ const createStyles = (Colors) => StyleSheet.create({
     width: '100%',
     backgroundColor: 'transparent',
     zIndex: 10,
-  },
-  progressContainer: {
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    width: '100%',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#E8628F',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base,
+    paddingHorizontal: 24,
     height: 56,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 22,
@@ -253,15 +238,16 @@ const createStyles = (Colors) => StyleSheet.create({
     fontFamily: Typography.fontFamily.serif,
     fontWeight: '700',
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: Spacing.xl,
+  
+  innerForm: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    paddingHorizontal: 24,
     paddingTop: Spacing.lg,
-    justifyContent: 'space-between',
+    paddingBottom: Spacing.xl,
   },
-  mainWrapper: {
-    flex: 1,
-  },
+
   title: {
     fontSize: 26,
     fontWeight: '700',
@@ -346,6 +332,7 @@ const createStyles = (Colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   pillSelected: {
     borderColor: '#E8628F',
@@ -370,10 +357,12 @@ const createStyles = (Colors) => StyleSheet.create({
     borderRadius: Radius.full,
     overflow: 'hidden',
     ...Shadow.md,
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   continueButtonDisabled: {
     shadowOpacity: 0,
     elevation: 0,
+    ...Platform.select({ web: { cursor: 'default' } as any, default: {} })
   },
   continueGradient: {
     height: 52,
@@ -385,11 +374,5 @@ const createStyles = (Colors) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 1,
-  },
-  stepText: {
-    fontSize: 12,
-    color: '#A592A5',
-    fontWeight: '600',
-    marginBottom: Spacing.sm,
   },
 });

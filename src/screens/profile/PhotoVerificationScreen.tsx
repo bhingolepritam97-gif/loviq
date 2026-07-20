@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { verifyUser } from '../../services/UserService';
 import * as ImagePicker from 'expo-image-picker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { ResponsiveContainer } from '../../core/responsive';
 
 export default function PhotoVerificationScreen({ navigation }) {
   const { colors: Colors } = useTheme();
@@ -162,6 +163,7 @@ export default function PhotoVerificationScreen({ navigation }) {
   });
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
@@ -359,6 +361,7 @@ export default function PhotoVerificationScreen({ navigation }) {
         )}
       </View>
     </View>
+    </ResponsiveContainer>
   );
 }
 

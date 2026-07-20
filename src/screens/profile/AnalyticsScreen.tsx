@@ -1,13 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-
-const { width } = Dimensions.get('window');
+import { ResponsiveContainer } from '../../core/responsive';
 
 // Mock Data
 const WEEKLY_DATA = [
@@ -30,8 +29,9 @@ const PHOTO_RANKING = [
 ];
 
 export default function AnalyticsScreen({ navigation }) {
+  const { width } = useWindowDimensions();
   const { colors: Colors } = useTheme();
-  const styles = createStyles(Colors);
+  const styles = createStyles(Colors, width);
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   
@@ -57,6 +57,7 @@ export default function AnalyticsScreen({ navigation }) {
   }, []);
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} accessible={true} accessibilityLabel="Go back" accessibilityRole="button">
@@ -192,10 +193,11 @@ export default function AnalyticsScreen({ navigation }) {
         </View>
       )}
     </View>
+    </ResponsiveContainer>
   );
 }
 
-const createStyles = (Colors) => StyleSheet.create({
+const createStyles = (Colors, width) => StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
   backBtn: { padding: Spacing.xs },
@@ -237,7 +239,7 @@ const createStyles = (Colors) => StyleSheet.create({
   insightDesc: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
 
   photoGrid: { flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.sm },
-  photoCard: { width: (width - Spacing.xl * 2 - 24) / 3, aspectRatio: 3/4, borderRadius: Radius.md, overflow: 'hidden', backgroundColor: Colors.border },
+  photoCard: { width: '31%', aspectRatio: 3/4, borderRadius: Radius.md, overflow: 'hidden', backgroundColor: Colors.border },
   photoImg: { width: '100%', height: '100%', resizeMode: 'cover' },
   rankBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: Colors.surface, width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', ...Shadow.sm },
   rankText: { fontSize: 12, fontWeight: '800', color: Colors.text },
@@ -250,7 +252,7 @@ const createStyles = (Colors) => StyleSheet.create({
   paywallTitle: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: Spacing.sm },
   paywallDesc: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', lineHeight: 22, marginBottom: Spacing.xl, paddingHorizontal: Spacing.lg },
   
-  upgradeBtn: { width: width - Spacing.xl * 2, borderRadius: Radius.full, overflow: 'hidden', ...Shadow.md },
+  upgradeBtn: { alignSelf: 'stretch', borderRadius: Radius.full, overflow: 'hidden', ...Shadow.md },
   upgradeBtnGradient: { paddingVertical: 18, alignItems: 'center', justifyContent: 'center' },
   upgradeBtnText: { color: Colors.white, fontSize: 18, fontWeight: '700', letterSpacing: 0.5 },
 });

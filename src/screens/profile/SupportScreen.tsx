@@ -18,6 +18,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { ResponsiveContainer } from '../../core/responsive';
 
 const FAQS = [
   {
@@ -81,6 +82,7 @@ export default function SupportScreen({ navigation }) {
   };
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <KeyboardAvoidingView 
       style={{ flex: 1, backgroundColor: Colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -161,6 +163,7 @@ export default function SupportScreen({ navigation }) {
 
       </ScrollView>
     </KeyboardAvoidingView>
+    </ResponsiveContainer>
   );
 }
 

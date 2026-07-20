@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Lovly",
-    "slug": "lovly",
+    "slug": "loviq",
     "scheme": "lovly",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -34,7 +34,39 @@
         "backgroundColor": "#120A1C",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "loviq.vercel.app"
+            },
+            {
+              "scheme": "https",
+              "host": "lovlyapp.com"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "lovly"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {},
     "plugins": [
@@ -44,7 +76,8 @@
       "@react-native-community/datetimepicker",
       "expo-web-browser",
       "expo-notifications",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-font"
     ],
     "extra": {
       "eas": {

@@ -1,6 +1,6 @@
 {
   "framework": null,
-  "buildCommand": "cd backend && npm run build && cd .. && npx expo export --platform web --output-dir dist",
+  "buildCommand": "cd backend && npm run build && cd .. && npx expo export --platform web --output-dir dist && mkdir -p dist/assets/fonts && cp -r dist/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/* dist/assets/fonts/",
   "outputDirectory": "dist",
   "rewrites": [
     {
@@ -8,15 +8,15 @@
       "destination": "/api/index.js"
     },
     {
-      "source": "/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/(.*)",
-      "destination": "/fonts/$1"
+      "source": "/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/:font",
+      "destination": "/assets/fonts/:font"
     },
     {
-      "source": "/fonts/(.*)",
-      "destination": "/fonts/$1"
+      "source": "/assets/node_modules/%40expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/:font",
+      "destination": "/assets/fonts/:font"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|_expo/|assets/|favicon.ico).*)",
       "destination": "/index.html"
     }
   ]

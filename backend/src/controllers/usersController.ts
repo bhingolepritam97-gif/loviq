@@ -69,16 +69,15 @@ async function checkProfileCompletion(userId) {
   if (!refreshed) return null;
 
   const hasBasicFields = refreshed.name && refreshed.birthdate && refreshed.gender;
-  const hasEnoughPhotos = refreshed.photos.length === 6;
+  const hasEnoughPhotos = refreshed.photos.length >= 2; // Onboarding requires MIN 2 photos (was === 6 which blocked all new users)
   const hasEnoughPrompts = refreshed.promptAnswers && refreshed.promptAnswers.length === 3;
   
   const categories = new Set((refreshed.promptAnswers || []).map(pa => pa.prompt?.category).filter(Boolean));
   const hasDiversePrompts = categories.size >= 2;
 
-  let shouldBeComplete = !!(hasBasicFields && hasEnoughPhotos && hasEnoughPrompts && hasDiversePrompts);
-  if (process.env.ALLOW_MOCK_AUTH === "true") {
-    shouldBeComplete = !!(hasBasicFields && refreshed.photos.length >= 1);
-  }
+  // Profile is complete when user has basic info + 2 photos. Prompts are bonus features, not a gate.
+  let shouldBeComplete = !!(hasBasicFields && hasEnoughPhotos);
+  console.log(`[checkProfileCompletion] uid=${refreshed.firebaseUid} name=${!!refreshed.name} birthdate=${!!refreshed.birthdate} gender=${!!refreshed.gender} photos=${refreshed.photos.length} → complete=${shouldBeComplete}`);
 
   if (shouldBeComplete !== refreshed.profileCompleted) {
     await refreshed.update({ profileCompleted: shouldBeComplete });

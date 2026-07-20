@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ResponsiveContainer } from '../../core/responsive';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Spacing, Radius, Shadow } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
@@ -49,6 +50,7 @@ export default function ReportUserScreen({ route, navigation }) {
   };
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <KeyboardAvoidingView 
       style={[styles.container, { paddingTop: insets.top }]} 
       behavior={Platform.OS === 'ios' ? 'padding' : null}
@@ -119,6 +121,7 @@ export default function ReportUserScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
+    </ResponsiveContainer>
   );
 }
 

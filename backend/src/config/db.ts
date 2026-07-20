@@ -22,6 +22,3 @@ const sequelize = new Sequelize(dbUrl, {
 });
 
 module.exports = sequelize;
-
-
-export {};

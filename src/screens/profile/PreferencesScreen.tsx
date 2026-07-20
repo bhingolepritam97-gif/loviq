@@ -1,91 +1,268 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  Alert,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
-import { Typography, Spacing, Radius } from '../../theme';
+import { Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
-import Button from '../../components/Button';
 import { Ionicons } from '@expo/vector-icons';
-
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { updateUserProfile } from '../../services/UserService';
+import { ResponsiveContainer } from '../../core/responsive';
 
 const SHOW_ME_OPTIONS = ['Women', 'Men', 'Everyone'];
 
-export default function PreferencesScreen({ navigation }) {
+export default function PreferencesScreen({ navigation }: any) {
   const { colors: Colors } = useTheme();
   const styles = createStyles(Colors);
   const insets = useSafeAreaInsets();
   const { user, profile, setProfile } = useAuth();
-  
+
+  // Discovery Preferences
   const [distance, setDistance] = useState(profile?.distance_range || 25);
   const [globalMode, setGlobalMode] = useState(profile?.global_mode || false);
-  const [ageRange, setAgeRange] = useState(profile?.age_range || [20, 35]);
+  const [ageRange, setAgeRange] = useState<[number, number]>(profile?.age_range || [20, 35]);
   const [showMe, setShowMe] = useState(profile?.interestedIn || 'Women');
   const [verifiedOnly, setVerifiedOnly] = useState(profile?.verifiedOnly || false);
 
+  // Profile Visibility & Privacy Toggles
+  const [showOnlineStatus, setShowOnlineStatus] = useState(profile?.showOnlineStatus !== false);
+  const [showDistanceVis, setShowDistanceVis] = useState(profile?.showDistanceVis !== false);
+  const [showWorkVis, setShowWorkVis] = useState(profile?.showWorkVis !== false);
+  const [showEduVis, setShowEduVis] = useState(profile?.showEduVis !== false);
+  const [showHeightVis, setShowHeightVis] = useState(profile?.showHeightVis !== false);
+  const [incognitoMode, setIncognitoMode] = useState(profile?.incognitoMode || false);
+  const [travelMode, setTravelMode] = useState(profile?.travelMode || false);
+  const [pausedProfile, setPausedProfile] = useState(profile?.pausedProfile || false);
+
+  const [saving, setSaving] = useState(false);
+
   const handleSave = async () => {
     if (user && profile) {
+      setSaving(true);
       const updatedPrefs = {
         distance_range: distance,
         global_mode: globalMode,
         age_range: ageRange,
         interestedIn: showMe,
-        verifiedOnly: verifiedOnly
+        verifiedOnly,
+        showOnlineStatus,
+        showDistanceVis,
+        showWorkVis,
+        showEduVis,
+        showHeightVis,
+        incognitoMode,
+        travelMode,
+        pausedProfile,
       };
       setProfile({ ...profile, ...updatedPrefs });
-      await updateUserProfile(user.uid, updatedPrefs);
+      try {
+        await updateUserProfile(user.uid, updatedPrefs);
+        Alert.alert('Saved 💾', 'Your visibility and discovery preferences have been updated.');
+        navigation.goBack();
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'Failed to update preferences.');
+      } finally {
+        setSaving(false);
+      }
     }
-    navigation.goBack();
   };
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessible={true} accessibilityLabel="Go back" accessibilityRole="button">
+      {/* Header Bar */}
+      <View style={styles.headerBar}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Go Back"
+        >
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Discovery Preferences</Text>
-        <View style={{ width: 36 }} />
+        <Text style={styles.headerTitle}>Visibility & Privacy</Text>
+        <TouchableOpacity onPress={handleSave} disabled={saving}>
+          <Text style={styles.saveHeaderBtnText}>{saving ? 'Saving...' : 'Save'}</Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        
-        {/* Global Mode Preference */}
-        <View style={styles.card}>
-          <View style={styles.labelRow}>
-            <Text style={styles.cardTitle}>Global Mode</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* ── 👁️ Preview My Profile Action ───────────────────────────── */}
+        <TouchableOpacity
+          style={styles.previewCardBtn}
+          onPress={() => navigation.navigate('ProfileDetail', { profile: { ...profile, id: profile?.id || profile?.uid } })}
+          activeOpacity={0.88}
+        >
+          <LinearGradient
+            colors={['#271236', '#1A0826']}
+            style={styles.previewGradient}
+          >
+            <Ionicons name="eye-outline" size={22} color={Colors.primary} style={{ marginRight: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.previewCardTitle}>👁️ Preview My Profile</Text>
+              <Text style={styles.previewCardSub}>See how your profile appears to candidates in Discovery</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* ── 🔒 Incognito & Travel Modes ──────────────────────────────── */}
+        <Text style={styles.serifSectionTitle}>Security Modes</Text>
+        <View style={styles.cardGroup}>
+          <View style={styles.toggleRowItem}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.toggleTitle}>🔒 Incognito Mode</Text>
+              <Text style={styles.toggleDesc}>Only people you've liked can see your profile.</Text>
+            </View>
             <Switch
-              value={globalMode}
-              onValueChange={setGlobalMode}
+              value={incognitoMode}
+              onValueChange={(val) => {
+                if (val && !profile?.isPremium) {
+                  navigation.navigate('Premium');
+                } else {
+                  setIncognitoMode(val);
+                }
+              }}
               trackColor={{ false: Colors.border, true: Colors.primary }}
-              thumbColor={Colors.white}
             />
           </View>
-          <Text style={styles.cardDesc}>Going global allows you to match with people around the world.</Text>
-        </View>
 
-        {/* Verified Users Only Preference */}
-        <View style={styles.card}>
-          <View style={styles.labelRow}>
-            <Text style={styles.cardTitle}>Verified Users Only</Text>
+          <View style={styles.toggleRowItem}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.toggleTitle}>✈️ Travel Mode (Passport)</Text>
+              <Text style={styles.toggleDesc}>Change your location to swipe in any city worldwide.</Text>
+            </View>
             <Switch
-              value={verifiedOnly}
-              onValueChange={setVerifiedOnly}
+              value={travelMode}
+              onValueChange={(val) => {
+                if (val && !profile?.isPremium) {
+                  navigation.navigate('Premium');
+                } else {
+                  setTravelMode(val);
+                }
+              }}
               trackColor={{ false: Colors.border, true: Colors.primary }}
-              thumbColor={Colors.white}
             />
           </View>
-          <Text style={styles.cardDesc}>Only show profiles of users who have verified their identity with a selfie check.</Text>
+
+          <View style={[styles.toggleRowItem, { borderBottomWidth: 0 }]}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.toggleTitle}>⏸️ Pause Profile</Text>
+              <Text style={styles.toggleDesc}>Hide profile from new discovery while keeping existing matches.</Text>
+            </View>
+            <Switch
+              value={pausedProfile}
+              onValueChange={setPausedProfile}
+              trackColor={{ false: Colors.border, true: Colors.primary }}
+            />
+          </View>
         </View>
 
-        {/* Distance Preference */}
-        {!globalMode && (
-          <View style={styles.card}>
-            <View style={styles.labelRow}>
-              <Text style={styles.cardTitle}>Maximum Distance</Text>
-              <Text style={styles.cardVal}>{distance} miles</Text>
+        {/* ── 👤 Profile Fields Visibility ─────────────────────────────── */}
+        <Text style={[styles.serifSectionTitle, { marginTop: 24 }]}>Profile Field Visibility</Text>
+        <View style={styles.cardGroup}>
+          <View style={styles.toggleRowItem}>
+            <Text style={styles.toggleTitle}>🟢 Online Status Indicator</Text>
+            <Switch
+              value={showOnlineStatus}
+              onValueChange={setShowOnlineStatus}
+              trackColor={{ false: Colors.border, true: Colors.primary }}
+            />
+          </View>
+
+          <View style={styles.toggleRowItem}>
+            <Text style={styles.toggleTitle}>📍 Distance (Miles away)</Text>
+            <Switch
+              value={showDistanceVis}
+              onValueChange={setShowDistanceVis}
+              trackColor={{ false: Colors.border, true: Colors.primary }}
+            />
+          </View>
+
+          <View style={styles.toggleRowItem}>
+            <Text style={styles.toggleTitle}>💼 Occupation & Company</Text>
+            <Switch
+              value={showWorkVis}
+              onValueChange={setShowWorkVis}
+              trackColor={{ false: Colors.border, true: Colors.primary }}
+            />
+          </View>
+
+          <View style={styles.toggleRowItem}>
+            <Text style={styles.toggleTitle}>🎓 Education & University</Text>
+            <Switch
+              value={showEduVis}
+              onValueChange={setShowEduVis}
+              trackColor={{ false: Colors.border, true: Colors.primary }}
+            />
+          </View>
+
+          <View style={[styles.toggleRowItem, { borderBottomWidth: 0 }]}>
+            <Text style={styles.toggleTitle}>📏 Height</Text>
+            <Switch
+              value={showHeightVis}
+              onValueChange={setShowHeightVis}
+              trackColor={{ false: Colors.border, true: Colors.primary }}
+            />
+          </View>
+        </View>
+
+        {/* ── 🛡️ Blocked & Hidden Contacts ─────────────────────────────── */}
+        <Text style={[styles.serifSectionTitle, { marginTop: 24 }]}>Safety & Contacts</Text>
+        <View style={styles.cardGroup}>
+          <TouchableOpacity
+            style={styles.navRowItem}
+            onPress={() => navigation.navigate('BlockedContacts')}
+          >
+            <Ionicons name="shield-outline" size={20} color={Colors.text} style={{ marginRight: 12 }} />
+            <Text style={styles.navRowTitle}>🛡️ Blocked Users</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.navRowItem, { borderBottomWidth: 0 }]}
+            onPress={() => Alert.alert('Hidden Phone Contacts 🚫', 'Import contacts to prevent friends, family, or exes from seeing your Lovly profile.')}
+          >
+            <Ionicons name="people-outline" size={20} color={Colors.text} style={{ marginRight: 12 }} />
+            <Text style={styles.navRowTitle}>🚫 Block Phone Contacts</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── 🌍 Discovery Preferences ─────────────────────────────────── */}
+        <Text style={[styles.serifSectionTitle, { marginTop: 24 }]}>Discovery Match Parameters</Text>
+        <View style={styles.cardGroup}>
+          {/* Show Me Gender */}
+          <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }}>
+            <Text style={styles.toggleTitle}>Show Me</Text>
+            <View style={styles.genderPillRow}>
+              {SHOW_ME_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.genderPillBtn, showMe === opt && styles.genderPillBtnActive]}
+                  onPress={() => setShowMe(opt)}
+                >
+                  <Text style={[styles.genderPillText, showMe === opt && styles.genderPillTextActive]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Maximum Distance */}
+          <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text style={styles.toggleTitle}>Maximum Distance</Text>
+              <Text style={styles.valHighlight}>{distance} miles</Text>
             </View>
             <Slider
               style={{ width: '100%', height: 40 }}
@@ -93,123 +270,155 @@ export default function PreferencesScreen({ navigation }) {
               maximumValue={100}
               step={1}
               value={distance}
-              onValueChange={(val) => setDistance(val)}
+              onValueChange={setDistance}
               minimumTrackTintColor={Colors.primary}
               maximumTrackTintColor={Colors.border}
               thumbTintColor={Colors.primary}
             />
           </View>
-        )}
 
-        {/* Age Preference */}
-        <View style={styles.card}>
-          <View style={styles.labelRow}>
-            <Text style={styles.cardTitle}>Age Range</Text>
-            <Text style={styles.cardVal}>{ageRange[0]} - {ageRange[1]}</Text>
-          </View>
-          <View style={styles.sliderMock}>
-            {[[18, 25], [20, 35], [25, 45], [30, 60]].map(([min, max]) => (
-              <TouchableOpacity
-                key={min}
-                style={[styles.sliderOption, ageRange[0] === min && ageRange[1] === max && styles.sliderOptionActive]}
-                onPress={() => setAgeRange([min, max])}
-                accessible={true} accessibilityLabel={`Select age range ${min} to ${max}`} accessibilityRole="button"
-              >
-                <Text style={[styles.sliderText, ageRange[0] === min && ageRange[1] === max && styles.sliderTextActive]}>{min}-{max}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          
-          {/* Custom Sliders for min/max age range adjustment */}
-          <View style={{ marginTop: Spacing.md }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.xs }}>
-              <Text style={{ fontSize: 12, color: Colors.textMuted, fontWeight: '700' }}>Min Age: {ageRange[0]}</Text>
-              <Text style={{ fontSize: 12, color: Colors.textMuted, fontWeight: '700' }}>Max Age: {ageRange[1]}</Text>
+          {/* Age Range */}
+          <View style={{ padding: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={styles.toggleTitle}>Age Range</Text>
+              <Text style={styles.valHighlight}>{ageRange[0]} - {ageRange[1]}</Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-              <View style={{ flex: 1 }}>
-                <Slider
-                  minimumValue={18}
-                  maximumValue={75}
-                  step={1}
-                  value={ageRange[0]}
-                  onValueChange={(val) => {
-                    if (val <= ageRange[1]) {
-                      setAgeRange([val, ageRange[1]]);
-                    }
-                  }}
-                  minimumTrackTintColor={Colors.primary}
-                  maximumTrackTintColor={Colors.border}
-                  thumbTintColor={Colors.primary}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Slider
-                  minimumValue={18}
-                  maximumValue={75}
-                  step={1}
-                  value={ageRange[1]}
-                  onValueChange={(val) => {
-                    if (val >= ageRange[0]) {
-                      setAgeRange([ageRange[0], val]);
-                    }
-                  }}
-                  minimumTrackTintColor={Colors.primary}
-                  maximumTrackTintColor={Colors.border}
-                  thumbTintColor={Colors.primary}
-                />
-              </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {[[18, 25], [20, 35], [25, 45], [30, 60]].map(([min, max]) => (
+                <TouchableOpacity
+                  key={min}
+                  style={[styles.presetAgeBtn, ageRange[0] === min && ageRange[1] === max && styles.presetAgeBtnActive]}
+                  onPress={() => setAgeRange([min, max])}
+                >
+                  <Text style={[styles.presetAgeText, ageRange[0] === min && ageRange[1] === max && styles.presetAgeTextActive]}>
+                    {min}-{max}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         </View>
 
-        {/* Show Me Preference */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Show Me</Text>
-          <View style={styles.genderRow}>
-            {SHOW_ME_OPTIONS.map(opt => (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.genderBtn, showMe === opt && styles.genderBtnActive]}
-                onPress={() => setShowMe(opt)}
-                accessible={true} accessibilityLabel={`Show me ${opt}`} accessibilityRole="button"
-              >
-                <Text style={[styles.genderText, showMe === opt && styles.genderTextActive]}>{opt}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <Button 
-          label="Save Preferences" 
+        {/* Save Floating Button */}
+        <TouchableOpacity
+          style={styles.saveBottomBtn}
           onPress={handleSave}
-          style={{ marginTop: Spacing.xl }}
-        />
+          disabled={saving}
+          activeOpacity={0.9}
+        >
+          <LinearGradient
+            colors={['#E8628F', '#C53D6B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.saveBottomGradient}
+          >
+            <Text style={styles.saveBottomText}>{saving ? 'Saving Preferences...' : 'Save Visibility & Discovery Settings'}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </ScrollView>
     </View>
+    </ResponsiveContainer>
   );
 }
 
-const createStyles = (Colors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, height: 60, borderBottomWidth: 1, borderColor: Colors.border },
-  backButton: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  backText: { fontSize: 24, fontWeight: '700', color: Colors.text },
-  title: { fontSize: Typography.fontSize.lg, fontWeight: '700', color: Colors.text },
-  scroll: { padding: Spacing.xl, paddingBottom: 100 },
-  card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1.5, borderColor: Colors.border, padding: Spacing.xl, marginBottom: Spacing.xl },
-  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
-  cardVal: { fontSize: 16, fontWeight: '700', color: Colors.primary },
-  cardDesc: { fontSize: 13, color: Colors.textMuted, marginTop: Spacing.xs, lineHeight: 18 },
-  sliderMock: { flexDirection: 'row', gap: Spacing.sm },
-  sliderOption: { flex: 1, paddingVertical: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, alignItems: 'center' },
-  sliderOptionActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '08' },
-  sliderText: { fontSize: 13, color: Colors.textMuted },
-  sliderTextActive: { color: Colors.primary, fontWeight: '700' },
-  genderRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
-  genderBtn: { flex: 1, paddingVertical: Spacing.md, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center' },
-  genderBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '12' },
-  genderText: { fontSize: 14, fontWeight: '600', color: Colors.textMuted },
-  genderTextActive: { color: Colors.primary },
-});
+const createStyles = (Colors: any) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#12051A' },
+    headerBar: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.xl,
+      paddingVertical: 12,
+    },
+    backBtn: { padding: 4 },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '400',
+      color: Colors.text,
+      fontFamily: Typography.fontFamily.serif,
+    },
+    saveHeaderBtnText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+
+    scrollContent: { paddingHorizontal: Spacing.xl, paddingBottom: 120 },
+
+    previewCardBtn: {
+      borderRadius: Radius['2xl'],
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: 'rgba(233,75,115,0.3)',
+      marginTop: 10,
+      ...Shadow.md,
+    },
+    previewGradient: { flexDirection: 'row', alignItems: 'center', padding: 18 },
+    previewCardTitle: { fontSize: 16, fontWeight: '700', color: '#FFF' },
+    previewCardSub: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+
+    serifSectionTitle: {
+      fontSize: 18,
+      fontWeight: '400',
+      color: Colors.text,
+      fontFamily: Typography.fontFamily.serif,
+      marginBottom: 10,
+    },
+
+    cardGroup: {
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderRadius: Radius['2xl'],
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.08)',
+      overflow: 'hidden',
+    },
+    toggleRowItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255,255,255,0.06)',
+    },
+    toggleTitle: { fontSize: 14, fontWeight: '600', color: Colors.text },
+    toggleDesc: { fontSize: 11, color: Colors.textMuted, marginTop: 2, lineHeight: 15 },
+
+    navRowItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255,255,255,0.06)',
+    },
+    navRowTitle: { fontSize: 14, fontWeight: '600', color: Colors.text },
+
+    genderPillRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+    genderPillBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: Radius.full,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.15)',
+      alignItems: 'center',
+    },
+    genderPillBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    genderPillText: { fontSize: 12, fontWeight: '600', color: Colors.textMuted },
+    genderPillTextActive: { color: '#FFF' },
+
+    valHighlight: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+
+    presetAgeBtn: {
+      flex: 1,
+      paddingVertical: 8,
+      borderRadius: Radius.md,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.15)',
+      alignItems: 'center',
+    },
+    presetAgeBtnActive: { backgroundColor: 'rgba(233,75,115,0.2)', borderColor: Colors.primary },
+    presetAgeText: { fontSize: 11, color: Colors.textMuted },
+    presetAgeTextActive: { color: Colors.primary, fontWeight: '700' },
+
+    saveBottomBtn: { marginTop: 28, borderRadius: Radius.full, overflow: 'hidden', ...Shadow.md },
+    saveBottomGradient: { height: 50, justifyContent: 'center', alignItems: 'center' },
+    saveBottomText: { fontSize: 14, fontWeight: '700', color: '#FFF' },
+  });

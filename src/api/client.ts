@@ -18,17 +18,47 @@ const BASE_URL = getBaseUrl();
 
 
 
+/**
+ * clearApiCache — wipe all cached GET responses from AsyncStorage.
+ * Call this on LOGOUT so the next user never sees a previous user's data.
+ */
+export async function clearApiCache() {
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const cacheKeys = allKeys.filter((k) => k.startsWith('cache_'));
+    if (cacheKeys.length > 0) {
+      await AsyncStorage.multiRemove(cacheKeys);
+      console.log('[apiClient] Cache cleared on logout. Keys removed:', cacheKeys.length);
+    }
+  } catch (e) {
+    console.warn('[apiClient] Failed to clear cache on logout:', e.message);
+  }
+}
+
 export async function apiClient(endpoint: string, { method = 'GET', body, ...customConfig }: any = {}) {
   let token = '';
   try {
     if (auth?.currentUser) {
       token = await auth.currentUser.getIdToken();
+      // Debug: log uid so you can verify the correct user's data is being loaded
+      console.log(`[apiClient] ${method} ${endpoint} — uid: ${auth.currentUser.uid}`);
     } else {
-      token = (await AsyncStorage.getItem('mock_user_token')) || '';
+      // Check for a mock user token (dev/demo mode only)
+      const mockToken = (await AsyncStorage.getItem('mock_user_token')) || '';
+      if (mockToken && mockToken.startsWith('mock_')) {
+        token = mockToken;
+      } else {
+        // Bug 2 fix: Do NOT generate a random ghost token — that creates a ghost user row
+        // in the DB and causes the wrong profile to appear on the Profile screen.
+        // Instead throw so the caller knows auth is missing.
+        console.error('[apiClient] No authenticated user and no mock token. Aborting request to prevent ghost profile.');
+        throw new Error('User is not authenticated. Please log in and try again.');
+      }
     }
   } catch (tokenErr) {
-    console.warn('[apiClient] Unauthenticated request or token pending:', tokenErr.message);
-    token = '';
+    if (tokenErr.message.includes('not authenticated')) throw tokenErr;
+    console.warn('[apiClient] Token fetch failed:', tokenErr.message);
+    token = 'default_anon_user';
   }
   
   const headers = {
@@ -75,7 +105,19 @@ export async function apiClient(endpoint: string, { method = 'GET', body, ...cus
     let response = await fetch(`${BASE_URL}${endpoint}`, config);
     clearTimeout(timeoutId);
     
-    let data = await response.json();
+    let data: any = {};
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      try {
+        data = JSON.parse(text);
+      } catch {
+        console.warn(`[apiClient] Non-JSON response on ${endpoint} (${response.status}):`, text.substring(0, 80));
+        data = { success: false, error: `HTTP ${response.status}` };
+      }
+    }
     
     // Auto-retry once if token has expired or is invalid
     if (!response.ok && (data.error === 'Invalid or expired Firebase token' || response.status === 401)) {

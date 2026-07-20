@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, ImageBackground } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, ImageBackground, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { trackOnboardingStep, trackOnboardingStepCompleted } from '../../utils/onboardingAnalytics';
 import { Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ResponsiveContainer, ResponsiveScreen, useBreakpoints } from '../../core/responsive';
 
 const INTEREST_OPTIONS = [
   'Travel', 'Fitness', 'Music', 'Foodie', 'Movies', 'Reading',
@@ -14,7 +15,7 @@ const INTEREST_OPTIONS = [
   'Nature', 'Astrology'
 ];
 
-const MIN_SELECTIONS = 3;
+const MIN_SELECTIONS = 5;
 
 export default function InterestsScreen({ navigation, route }) {
   const { colors: Colors } = useTheme();
@@ -23,6 +24,7 @@ export default function InterestsScreen({ navigation, route }) {
   const [selected, setSelected] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const startTime = useRef(Date.now());
+  const { isPhone } = useBreakpoints();
 
   useEffect(() => {
     trackOnboardingStep('interests');
@@ -40,7 +42,7 @@ export default function InterestsScreen({ navigation, route }) {
 
   const handleContinue = () => {
     trackOnboardingStepCompleted('interests', Date.now() - startTime.current);
-    navigation.navigate('PhotoUpload', {
+    navigation.navigate('LocationPermission', {
       ...route.params,
       interests: selected,
     });
@@ -59,34 +61,33 @@ export default function InterestsScreen({ navigation, route }) {
         end={{ x: 0.8, y: 1 }}
       />
       
-      {/* Header with Wordmark and Progress */}
-      <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressBarFill, { width: '100%' }]} />
+      <ResponsiveScreen keyboardAvoiding scrollable backgroundColor="transparent">
+        {/* Header with Wordmark and Progress */}
+        <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
+          <View style={styles.progressContainer}>
+            <View style={[styles.progressBarFill, { width: '100%' }]} />
+          </View>
+          <View style={styles.headerRow}>
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()} 
+              style={styles.backBtn}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={22} color={Colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Lovly</Text>
+            <View style={{ width: 44 }} />
+          </View>
         </View>
-        <View style={styles.headerRow}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            style={styles.backBtn}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="arrow-back" size={22} color={Colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Lovly</Text>
-          <View style={{ width: 44 }} />
-        </View>
-      </View>
 
-      <ScrollView 
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.mainWrapper}>
+        {/* Inner Form with Desktop support */}
+        <View style={styles.innerForm}>
           <Text style={styles.title}>What are you into?</Text>
           <Text style={styles.subtitle}>
-            Pick at least {MIN_SELECTIONS} — this helps us curate your romantic discovery.
+            Pick at least {MIN_SELECTIONS} interests — this helps us curate your romantic discovery.
           </Text>
 
           {/* Search Input */}
@@ -116,6 +117,7 @@ export default function InterestsScreen({ navigation, route }) {
                     accessible={true}
                     accessibilityRole="button"
                     accessibilityLabel={`Interest: ${interest}`}
+                    activeOpacity={0.75}
                   >
                     {isSelected && (
                       <Ionicons name="checkmark" size={14} color="#FFFFFF" style={styles.pillCheck} />
@@ -150,32 +152,32 @@ export default function InterestsScreen({ navigation, route }) {
               </Text>
             </View>
           </ImageBackground>
-        </View>
 
-        {/* Footer Link Button */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.continueLinkButton, !isValid && styles.continueLinkButtonDisabled]}
-            disabled={!isValid}
-            onPress={handleContinue}
-            activeOpacity={isValid ? 0.7 : 1}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Continue to photo upload step"
-          >
-            <Text style={[styles.continueLinkText, !isValid && styles.continueLinkTextDisabled]}>
-              CONTINUE{' '}
-            </Text>
-            <Ionicons 
-              name="arrow-forward" 
-              size={18} 
-              color={isValid ? '#E8628F' : '#7A667A'} 
-              style={styles.arrowIcon}
-            />
-          </TouchableOpacity>
-          <Text style={styles.stepText}>Step 3 of 3</Text>
+          {/* Footer Link Button */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.continueLinkButton, !isValid && styles.continueLinkButtonDisabled]}
+              disabled={!isValid}
+              onPress={handleContinue}
+              activeOpacity={isValid ? 0.7 : 1}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Continue to photo upload step"
+            >
+              <Text style={[styles.continueLinkText, !isValid && styles.continueLinkTextDisabled]}>
+                CONTINUE{' '}
+              </Text>
+              <Ionicons 
+                name="arrow-forward" 
+                size={18} 
+                color={isValid ? '#E8628F' : '#7A667A'} 
+                style={styles.arrowIcon}
+              />
+            </TouchableOpacity>
+            <Text style={styles.stepText}>Step 3 of 3</Text>
+          </View>
         </View>
-      </ScrollView>
+      </ResponsiveScreen>
     </View>
   );
 }
@@ -189,6 +191,8 @@ const createStyles = (Colors) => StyleSheet.create({
     width: '100%',
     backgroundColor: 'transparent',
     zIndex: 10,
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   progressContainer: {
     height: 4,
@@ -203,7 +207,7 @@ const createStyles = (Colors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base,
+    paddingHorizontal: 24,
     height: 56,
   },
   backBtn: {
@@ -213,6 +217,7 @@ const createStyles = (Colors) => StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   headerTitle: {
     fontSize: 22,
@@ -220,15 +225,16 @@ const createStyles = (Colors) => StyleSheet.create({
     fontFamily: Typography.fontFamily.serif,
     fontWeight: '700',
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: Spacing.xl,
+
+  innerForm: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    paddingHorizontal: 24,
     paddingTop: Spacing.lg,
-    justifyContent: 'space-between',
+    paddingBottom: Spacing.xl,
   },
-  mainWrapper: {
-    flex: 1,
-  },
+
   title: {
     fontSize: 26,
     fontWeight: '700',
@@ -278,6 +284,7 @@ const createStyles = (Colors) => StyleSheet.create({
     borderWidth: 1, 
     borderColor: 'rgba(255, 255, 255, 0.15)', 
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   pillSelected: { 
     backgroundColor: '#E8628F', 
@@ -339,9 +346,11 @@ const createStyles = (Colors) => StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: Spacing.sm,
     width: '100%',
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   continueLinkButtonDisabled: {
     opacity: 0.5,
+    ...Platform.select({ web: { cursor: 'default' } as any, default: {} })
   },
   continueLinkText: {
     color: '#E8628F',

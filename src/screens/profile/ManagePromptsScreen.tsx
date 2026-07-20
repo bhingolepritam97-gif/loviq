@@ -9,6 +9,7 @@ import AIBioSuggestions from '../../components/AIBioSuggestions';
 import { useAuth } from '../../context/AuthContext';
 import { fetchAiSuggestions } from '../../services/UserService';
 import { Ionicons } from '@expo/vector-icons';
+import { ResponsiveContainer } from '../../core/responsive';
 
 const PREDEFINED_QUESTIONS = [
   'A random fact I love is...',
@@ -136,6 +137,7 @@ export default function ManagePromptsScreen({ navigation }) {
   };
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
@@ -314,6 +316,7 @@ export default function ManagePromptsScreen({ navigation }) {
         type="prompt"
       />
     </View>
+    </ResponsiveContainer>
   );
 }
 

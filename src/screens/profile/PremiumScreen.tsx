@@ -8,6 +8,7 @@ import { PREMIUM_FEATURES } from '../../data/constants';
 import { useAuth } from '../../context/AuthContext';
 import { upgradeToPremium } from '../../services/UserService';
 import { Purchases } from '../../services/RevenueCatService';
+import { ResponsiveContainer, useBreakpoints } from '../../core/responsive';
 
 const FALLBACK_PACKAGES = [
   { identifier: 'gold_weekly', packageType: 'WEEKLY', product: { title: 'Lovly Gold (1 Week)', priceString: '$6.99', description: 'Billed weekly' } },
@@ -19,6 +20,7 @@ export default function PremiumScreen({ navigation }) {
   const { colors: Colors } = useTheme();
   const styles = createStyles(Colors);
   const insets = useSafeAreaInsets();
+  const { isPhone } = useBreakpoints();
   const [packages, setPackages] = useState(FALLBACK_PACKAGES);
   const [selectedPackage, setSelectedPackage] = useState(FALLBACK_PACKAGES[0]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -99,6 +101,7 @@ export default function PremiumScreen({ navigation }) {
   };
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
@@ -120,19 +123,27 @@ export default function PremiumScreen({ navigation }) {
         <View style={styles.content}>
           {/* Plan Picker */}
           <Text style={styles.sectionTitle}>Choose a Plan</Text>
-          <View style={styles.planColumn}>
+          <View style={isPhone ? styles.planColumn : styles.planRow}>
             {packages.map((pkg) => (
               <TouchableOpacity
                 key={pkg.identifier}
-                style={[styles.planCard, selectedPackage?.identifier === pkg.identifier && styles.planCardSelected]}
+                style={[
+                  styles.planCard,
+                  !isPhone && styles.planCardDesktop,
+                  selectedPackage?.identifier === pkg.identifier && styles.planCardSelected
+                ]}
                 onPress={() => setSelectedPackage(pkg)}
                 accessible={true} accessibilityLabel={`Select ${pkg.product.title}`} accessibilityRole="button"
               >
-                <View style={{ flex: 1, paddingRight: Spacing.sm }}>
-                  <Text style={styles.planLabel}>{pkg.product.title}</Text>
+                <View style={isPhone ? { flex: 1, paddingRight: Spacing.sm } : { alignItems: 'center', marginBottom: Spacing.md }}>
+                  <Text style={[styles.planLabel, !isPhone && styles.planLabelDesktop]}>{pkg.product.title}</Text>
                   <Text style={styles.planTag}>{pkg.product.description}</Text>
                 </View>
-                <Text style={[styles.planPrice, selectedPackage?.identifier === pkg.identifier && styles.planPriceSelected]}>
+                <Text style={[
+                  styles.planPrice,
+                  !isPhone && styles.planPriceDesktop,
+                  selectedPackage?.identifier === pkg.identifier && styles.planPriceSelected
+                ]}>
                   {pkg.product.priceString}
                 </Text>
               </TouchableOpacity>
@@ -227,11 +238,12 @@ export default function PremiumScreen({ navigation }) {
         )}
       </View>
     </View>
+    </ResponsiveContainer>
   );
 }
 
 const createStyles = (Colors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: Colors.background, position: 'relative' },
   scroll: { paddingBottom: 220 },
 
   hero: {
@@ -262,15 +274,19 @@ const createStyles = (Colors) => StyleSheet.create({
   },
 
   planColumn: { gap: 12, marginBottom: Spacing.xl },
+  planRow: { flexDirection: 'row', gap: 12, marginBottom: Spacing.xl },
   planCard: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.lg,
     padding: Spacing.md, backgroundColor: Colors.surface,
   },
+  planCardDesktop: { flexDirection: 'column', flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: Spacing.xl },
   planCardSelected: { borderColor: Colors.primary, backgroundColor: Colors.primary + '0D' },
   planLabel: { fontSize: 16, fontWeight: '600', color: Colors.text },
+  planLabelDesktop: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
   planTag: { fontSize: 12, color: Colors.primary, marginTop: 2, fontWeight: '600' },
   planPrice: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  planPriceDesktop: { fontSize: 24, fontWeight: '900', marginTop: Spacing.sm },
   planPriceSelected: { color: Colors.primary },
 
   // Comparison Grid Styles

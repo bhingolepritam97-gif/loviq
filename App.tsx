@@ -6,19 +6,22 @@ import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import OfflineNotice from './src/components/OfflineNotice';
 import { ThemeProvider } from './src/context/ThemeContext';
+import { ResponsiveProvider } from './src/context/ResponsiveContext';
 
 export default function App() {
   return (
     <ThemeProvider>
-      <SafeAreaProvider>
-        <StatusBar style="auto" />
-        <AuthProvider>
-          <ErrorBoundary>
-            <AppNavigator />
-            <OfflineNotice />
-          </ErrorBoundary>
-        </AuthProvider>
-      </SafeAreaProvider>
+      <ResponsiveProvider>
+        <SafeAreaProvider>
+          <StatusBar style="auto" />
+          <AuthProvider>
+            <ErrorBoundary>
+              <AppNavigator />
+              <OfflineNotice />
+            </ErrorBoundary>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </ResponsiveProvider>
     </ThemeProvider>
   );
 }

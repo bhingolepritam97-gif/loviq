@@ -18,6 +18,7 @@ import { apiClient } from '../../api/client';
 import { updateUserProfile } from '../../services/UserService';
 import AnimatedLogo from '../../components/brand/AnimatedLogo';
 import { Ionicons } from '@expo/vector-icons';
+import { ResponsiveContainer } from '../../core/responsive';
 
 /**
  * EmptyStateScreen.js
@@ -117,12 +118,13 @@ export default function EmptyStateScreen({ navigation, route, inline = false }) 
   }
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        { paddingTop, opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-      ]}
-    >
+    <ResponsiveContainer>
+      <Animated.View
+        style={[
+          styles.container,
+          { paddingTop, opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+        ]}
+      >
       <View style={styles.iconWrapper}>
         <AnimatedLogo type="icon" animation="pulse" size="lg" />
       </View>
@@ -177,6 +179,7 @@ export default function EmptyStateScreen({ navigation, route, inline = false }) 
         <Text style={styles.secondaryLink}>Adjust filters manually</Text>
       </TouchableOpacity>
     </Animated.View>
+    </ResponsiveContainer>
   );
 }
 

@@ -13,6 +13,7 @@ const DateShare = require("./dateShare");
 const Config = require("./config");
 const Prompt = require("./prompt");
 const UserPromptAnswer = require("./userPromptAnswer");
+const ModerationLog = require("./moderationLog");
 
 // --- Associations ---
 User.hasMany(Photo, { foreignKey: "userId", as: "photos", onDelete: "CASCADE" });
@@ -59,7 +60,10 @@ User.hasMany(UserPromptAnswer, { foreignKey: "userId", as: "promptAnswers" });
 UserPromptAnswer.belongsTo(User, { foreignKey: "userId" });
 UserPromptAnswer.belongsTo(Prompt, { foreignKey: "promptId", as: "prompt" });
 
-module.exports = { sequelize, User, Photo, Swipe, Match, Message, Block, Report, InviteCode, BannedIdentity, TrustedContact, DateShare, Config, Prompt, UserPromptAnswer };
+User.hasMany(ModerationLog, { foreignKey: "userId", as: "moderationLogs" });
+ModerationLog.belongsTo(User, { foreignKey: "userId" });
+
+module.exports = { sequelize, User, Photo, Swipe, Match, Message, Block, Report, InviteCode, BannedIdentity, TrustedContact, DateShare, Config, Prompt, UserPromptAnswer, ModerationLog };
 
 
 export {};

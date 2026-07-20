@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Image, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Typography, Radius, Gradients } from '../theme';
 import { useTheme } from '../context/ThemeContext';
+import { useBreakpoints } from '../core/responsive';
 
 /**
  * Avatar — circular profile image
@@ -21,21 +23,24 @@ interface AvatarProps {
   style?: any;
 }
 
-export default function Avatar({ uri, name, size = 48, showOnline = false, showBorder = false, style }: AvatarProps) {
+export default function Avatar({ uri, name, size, showOnline = false, showBorder = false, style }: AvatarProps) {
   const { colors: Colors } = useTheme();
+  const { isPhone } = useBreakpoints();
+  const defaultSize = isPhone ? 48 : 64;
+  const resolvedSize = size ?? defaultSize;
   const styles = createStyles(Colors);
   const initials = name ? name.slice(0, 1).toUpperCase() : '?';
   const borderWidth = showBorder ? 2 : 0;
-  const innerSize = size - borderWidth * 2 - 4;
+  const innerSize = resolvedSize - borderWidth * 2 - 4;
 
   if (showBorder) {
     return (
-      <View style={[{ width: size, height: size }, style]}>
+      <View style={[{ width: resolvedSize, height: resolvedSize }, style]}>
         <LinearGradient
           colors={Gradients.primary.colors}
           start={Gradients.primary.start}
           end={Gradients.primary.end}
-          style={[styles.gradientBorder, { width: size, height: size, borderRadius: size / 2 }]}
+          style={[styles.gradientBorder, { width: resolvedSize, height: resolvedSize, borderRadius: resolvedSize / 2 }]}
         >
           <View style={[styles.innerBorder, { width: innerSize, height: innerSize, borderRadius: innerSize / 2 }]}>
             {uri ? (
@@ -47,27 +52,27 @@ export default function Avatar({ uri, name, size = 48, showOnline = false, showB
             )}
           </View>
         </LinearGradient>
-        {showOnline && <View style={[styles.onlineDot, { width: size * 0.27, height: size * 0.27, borderRadius: size * 0.135, right: 0, bottom: 0 }]} />}
+        {showOnline && <View style={[styles.onlineDot, { width: resolvedSize * 0.27, height: resolvedSize * 0.27, borderRadius: resolvedSize * 0.135, right: 0, bottom: 0 }]} />}
       </View>
     );
   }
 
   return (
-    <View style={[{ width: size, height: size }, style]}>
+    <View style={[{ width: resolvedSize, height: resolvedSize }, style]}>
       {uri ? (
-        <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} resizeMode="cover" />
+        <Image source={{ uri }} style={{ width: resolvedSize, height: resolvedSize, borderRadius: resolvedSize / 2 }} contentFit="cover" />
       ) : (
         <LinearGradient
           colors={Gradients.primary.colors}
           start={Gradients.primary.start}
           end={Gradients.primary.end}
-          style={[styles.fallback, { width: size, height: size, borderRadius: size / 2 }]}
+          style={[styles.fallback, { width: resolvedSize, height: resolvedSize, borderRadius: resolvedSize / 2 }]}
         >
-          <Text style={[styles.initials, { fontSize: size * 0.38 }]}>{initials}</Text>
+          <Text style={[styles.initials, { fontSize: resolvedSize * 0.38 }]}>{initials}</Text>
         </LinearGradient>
       )}
       {showOnline && (
-        <View style={[styles.onlineDot, { width: size * 0.27, height: size * 0.27, borderRadius: size * 0.135, right: 0, bottom: 0 }]} />
+        <View style={[styles.onlineDot, { width: resolvedSize * 0.27, height: resolvedSize * 0.27, borderRadius: resolvedSize * 0.135, right: 0, bottom: 0 }]} />
       )}
     </View>
   );

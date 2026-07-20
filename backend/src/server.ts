@@ -65,6 +65,10 @@ app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 // Health endpoint registered BEFORE rate limiter so warm-up pings don't count against quota
 app.get("/health", (req, res) => res.json({ success: true, status: "ok" }));
 
+const safetyMiddleware = require("./middleware/safetyMiddleware");
+app.use(safetyMiddleware.fingerprintDetector);
+app.use(safetyMiddleware.botDetector);
+
 app.use(
   rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60_000,
@@ -90,14 +94,12 @@ const { Server } = require("socket.io");
 const { User, Match, Message, sequelize } = require("./models");
 
 // Run self-healing table migrations on startup to support women-first conversation model
+// Run self-healing table migrations asynchronously without blocking cold-start
 if (sequelize) {
-  sequelize.query(`
-    ALTER TABLE matches ADD COLUMN IF NOT EXISTS first_message_sender_id UUID;
-  `).catch(err => console.error("[migration] first_message_sender_id column failed:", err));
-
-  sequelize.query(`
-    ALTER TABLE matches ADD COLUMN IF NOT EXISTS chat_unlocked BOOLEAN DEFAULT FALSE;
-  `).catch(err => console.error("[migration] chat_unlocked column failed:", err));
+  setTimeout(() => {
+    sequelize.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS first_message_sender_id UUID;`).catch(() => {});
+    sequelize.query(`ALTER TABLE matches ADD COLUMN IF NOT EXISTS chat_unlocked BOOLEAN DEFAULT FALSE;`).catch(() => {});
+  }, 100);
 }
 
 const server = http.createServer(app);

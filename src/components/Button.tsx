@@ -2,10 +2,12 @@
 // Lovly — GradientButton shared component
 // ─────────────────────────────────────────────
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Typography, Spacing, Radius, Shadow, Gradients } from '../theme';
 import { useTheme } from '../context/ThemeContext';
+
+import { useBreakpoints } from '../core/responsive';
 
 /**
  * GradientButton — full-width gradient CTA
@@ -33,6 +35,7 @@ export default function Button({
   rightIcon,
 }: any) {
   const { colors: Colors } = useTheme();
+  const { isPhone } = useBreakpoints();
   const styles = createStyles(Colors);
   const isDisabled = disabled || loading;
   const heights = { sm: 40, md: 48, lg: 56 };
@@ -41,6 +44,8 @@ export default function Button({
   const containerStyle = [
     styles.base,
     { height: heights[size], borderRadius: Radius['2xl'] },
+    !isPhone && { alignSelf: 'center', minWidth: 200, width: 'auto', paddingHorizontal: Spacing.xl },
+    Platform.OS === 'web' && { cursor: isDisabled ? 'not-allowed' : 'pointer' as any },
     style,
   ];
 

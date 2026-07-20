@@ -22,6 +22,7 @@ import {
   Platform,
   Switch,
 } from 'react-native';
+import { ResponsiveContainer } from '../../core/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
@@ -300,7 +301,8 @@ export default function FiltersScreen({ navigation }) {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <ResponsiveContainer safeArea={false} centered={false}>
+      <View style={styles.container}>
       {/* ── Header ───────────────────────────────────────────────────── */}
       <View style={[styles.header, { marginTop: insets.top }]}>
         <TouchableOpacity
@@ -486,6 +488,7 @@ export default function FiltersScreen({ navigation }) {
       </View>
 
     </View>
+    </ResponsiveContainer>
   );
 }
 

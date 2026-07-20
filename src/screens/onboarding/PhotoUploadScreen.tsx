@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, TextInput, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker'; 
@@ -10,12 +10,13 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { trackOnboardingStep, trackOnboardingStepCompleted, trackOnboardingComplete } from '../../utils/onboardingAnalytics';
 import { startGracePeriod } from '../../utils/gracePeriod';
 import { useAuth } from '../../context/AuthContext';
-import { createUserProfile } from '../../services/UserService';
+import { createUserProfile, syncUserDocumentOnComplete } from '../../services/UserService';
 import { uploadImageToFirebase } from '../../services/ImageService';
 import { auth } from '../../config/firebase';
 import { Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ResponsiveContainer, ResponsiveScreen, useBreakpoints } from '../../core/responsive';
 
 const MIN_PHOTOS = 2;
 const MAX_PHOTOS = 6;
@@ -28,8 +29,8 @@ const compressImage = async (uri) => {
       { compress: 0.7, format: SaveFormat.JPEG }
     );
     return result.uri;
-  } catch (error) {
-    console.warn('Failed compressing image, returning original:', error.message);
+  } catch (err) {
+    console.warn('Image compression failed:', err);
     return uri;
   }
 };
@@ -38,27 +39,36 @@ export default function PhotoUploadScreen({ route, navigation }) {
   const { colors: Colors } = useTheme();
   const styles = createStyles(Colors);
   const insets = useSafeAreaInsets();
+  const { user, setProfile, setUser } = useAuth();
+  
   const [photos, setPhotos] = useState([]);
-  const [showBioInput, setShowBioInput] = useState(false);
   const [bio, setBio] = useState('');
+  const [showBioInput, setShowBioInput] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const { setProfile, user } = useAuth();
-  const flowStartTime = useRef(route.params?.flowStartTime || Date.now());
-  const stepStartTime = useRef(Date.now());
+  const startTime = useRef(Date.now());
+  const { isPhone } = useBreakpoints();
 
   useEffect(() => {
     trackOnboardingStep('photo_upload');
   }, []);
 
   const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'We need access to your photos to upload.');
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [3, 4],
       quality: 0.8,
     });
-    if (!result.canceled && photos.length < MAX_PHOTOS) {
-      setPhotos((prev) => [...prev, result.assets[0].uri]);
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const compressedUri = await compressImage(result.assets[0].uri);
+      setPhotos((prev) => [...prev, compressedUri]);
     }
   };
 
@@ -66,107 +76,127 @@ export default function PhotoUploadScreen({ route, navigation }) {
     setPhotos((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const isValid = photos.length >= MIN_PHOTOS;
+  const finishOnboarding = async (finalBio) => {
+    if (photos.length < MIN_PHOTOS) {
+      Alert.alert('More Photos Required', `Please upload at least ${MIN_PHOTOS} photos to continue.`);
+      return;
+    }
 
-  const finishOnboarding = async (bioValue) => {
-    if (submitting) return;
     setSubmitting(true);
-    
     try {
-      trackOnboardingStepCompleted('photo_upload', Date.now() - stepStartTime.current);
-      trackOnboardingComplete(Date.now() - flowStartTime.current);
-
       await startGracePeriod();
 
-      let currentUser = auth.currentUser || user;
+      let currentUser = auth?.currentUser || user;
       if (!currentUser) {
-        try {
-          const { signInAnonymously } = require('firebase/auth');
-          const userCredential = await signInAnonymously(auth);
-          currentUser = userCredential.user;
-        } catch (lazyErr) {
-          console.warn('[PhotoUploadScreen] Lazy sign-in failed, creating mock session:', lazyErr.message);
-          currentUser = {
-            uid: `mock_${Math.random().toString(36).substring(7)}`,
-            email: 'mockuser@lovly.app'
-          };
+        console.log('[PhotoUploadScreen] auth.currentUser is null, waiting up to 5s...');
+        await new Promise<void>((resolve) => {
+          let waited = 0;
+          const interval = setInterval(() => {
+            waited += 200;
+            if (auth?.currentUser) {
+              clearInterval(interval);
+              resolve();
+            } else if (waited >= 5000) {
+              clearInterval(interval);
+              resolve(); 
+            }
+          }, 200);
+        });
+        currentUser = auth?.currentUser;
+      }
+
+      if (!currentUser) {
+        const fallbackUid = route?.params?.uid || route?.params?.ruid;
+        if (fallbackUid) {
+          currentUser = { uid: fallbackUid, email: route?.params?.email || 'user@lovly.app' };
+          console.warn('[PhotoUploadScreen] Using route.params uid as fallback:', fallbackUid);
+        } else {
+          throw new Error('Cannot save profile: user is not authenticated. Please go back and sign in again.');
         }
       }
-      
+
+      console.log('[PhotoUploadScreen] Saving profile for uid:', currentUser.uid);
+
       let offlineFallbackUsed = false;
       const uploadedPhotoUrls = [];
       for (const localUri of photos) {
         try {
-          const compressed = await compressImage(localUri);
-          const downloadUrl = await uploadImageToFirebase(compressed);
-          uploadedPhotoUrls.push(downloadUrl);
+          const remoteUrl = await uploadImageToFirebase(localUri);
+          uploadedPhotoUrls.push({ url: remoteUrl, label: 'Onboarding' });
         } catch (uploadErr) {
-          console.warn('[PhotoUploadScreen] Upload failed, appending local fallback Uri:', uploadErr.message);
-          uploadedPhotoUrls.push(localUri);
+          console.warn('[PhotoUploadScreen] Firebase storage failed, using local URI fallback for sandbox:', uploadErr);
+          uploadedPhotoUrls.push({ url: localUri, label: 'Sandbox Local' });
           offlineFallbackUsed = true;
         }
       }
 
-      let locationData = { latitude: 18.5204, longitude: 73.8567, cityName: 'Pune' };
+      let lat = 18.5204;
+      let lng = 73.8567;
+      let cityName = 'Pune';
+
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
+        const locPermission = await Location.getForegroundPermissionsAsync();
+        if (locPermission.status === 'granted') {
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          const reverse = await Location.reverseGeocodeAsync({
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-          });
-          locationData = {
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-            cityName: reverse[0]?.city || reverse[0]?.subregion || 'Pune',
-          };
+          lat = loc.coords.latitude;
+          lng = loc.coords.longitude;
+          
+          const reverseGeocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+          if (reverseGeocode && reverseGeocode.length > 0) {
+            cityName = reverseGeocode[0].city || reverseGeocode[0].district || reverseGeocode[0].region || 'Pune';
+          }
         }
       } catch (locErr) {
-        console.warn('Geolocation capture bypassed during onboarding:', locErr.message);
+        console.warn('[PhotoUploadScreen] Could not fetch location coordinates, using default (Pune):', locErr.message);
       }
 
-      const newProfile = {
-        name: route.params?.name,
-        birthdate: route.params?.birthday,
-        gender: route.params?.gender,
-        genderPreference: route.params?.interestedIn ? [route.params.interestedIn] : ['Everyone'],
-        bio: bioValue,
+      const hash = geofire.geohashForLocation([lat, lng]);
+
+      const profilePayload = {
+        id: currentUser.uid,
+        name: route.params?.name || 'Lovly User',
+        email: currentUser.email || route.params?.email || 'user@lovly.app',
+        birthday: route.params?.birthday || '1998-01-01',
+        gender: route.params?.gender || 'Non-binary',
+        interestedIn: route.params?.interestedIn || 'Everyone',
+        intent: route.params?.intent || 'not_sure',
         interests: route.params?.interests || [],
         photos: uploadedPhotoUrls,
-        latitude: locationData.latitude,
-        longitude: locationData.longitude,
-        cityName: locationData.cityName,
-        distance_range: 25,
-        age_range: [18, 35],
-        eloScore: 1500,
-        isPremium: false,
-        isVerified: false,
-        profileComplete: true,
+        bio: finalBio.trim(),
+        latitude: lat,
+        longitude: lng,
+        geohash: hash,
+        cityName,
+        onboardingComplete: true,
         createdAt: new Date().toISOString(),
       };
 
-      await createUserProfile(currentUser.uid, newProfile);
-      await AsyncStorage.setItem(`profileComplete_${currentUser.uid}`, 'true');
+      const updatedProfile = await createUserProfile(currentUser.uid, profilePayload);
+      
+      try {
+        await syncUserDocumentOnComplete(currentUser.uid, profilePayload);
+      } catch (syncErr) {
+        console.warn('[PhotoUploadScreen] Sync trigger failed, profile was still saved:', syncErr.message);
+      }
 
-      setProfile({
-        id: currentUser.uid,
-        ...newProfile
-      });
-      // The state change to complete profile will automatically trigger AppNavigator to switch stacks to 'Main'.
+      setProfile(updatedProfile);
+      if (!user) {
+        setUser(currentUser);
+      }
+
+      trackOnboardingStepCompleted('photo_upload', Date.now() - startTime.current);
+      trackOnboardingComplete(currentUser.uid);
+      
+      console.log('[PhotoUploadScreen] Onboarding successfully finished!');
     } catch (err) {
-      console.error(err);
-      const isOfflineMsg = err.message?.includes('Network request failed') || err.message?.includes('network') || err.message?.includes('API Timeout');
-      Alert.alert(
-        isOfflineMsg ? 'No Internet Connection' : 'Onboarding Error',
-        isOfflineMsg 
-          ? 'We could not connect to Lovly servers. Please check your internet connection and try again.' 
-          : (err.message || 'Failed to complete profile creation. Please try again.')
-      );
+      console.error('[PhotoUploadScreen] Finish error:', err);
+      Alert.alert('Save Failed', err.message || 'Could not create profile. Please check your network and try again.');
     } finally {
       setSubmitting(false);
     }
   };
+
+  const isValid = photos.length >= MIN_PHOTOS;
 
   return (
     <View style={styles.container}>
@@ -177,39 +207,33 @@ export default function PhotoUploadScreen({ route, navigation }) {
         end={{ x: 0.8, y: 1 }}
       />
       
-      <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressBarFill, { width: '100%' }]} />
+      <ResponsiveScreen keyboardAvoiding scrollable backgroundColor="transparent">
+        {/* Header */}
+        <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
+          <View style={styles.progressContainer}>
+            <View style={[styles.progressBarFill, { width: '100%' }]} />
+          </View>
+          <View style={styles.headerRow}>
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()} 
+              style={styles.backBtn}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={22} color={Colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Lovly</Text>
+            <TouchableOpacity style={styles.helpBtn} accessible={true} accessibilityRole="button" accessibilityLabel="Help info">
+              <Ionicons name="help-circle-outline" size={22} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.headerRow}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            style={styles.backBtn}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="arrow-back" size={22} color="#FFF0F3" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Lovly</Text>
-          <TouchableOpacity 
-            style={styles.helpBtn}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Help"
-          >
-            <Ionicons name="help-circle-outline" size={22} color="#FFF0F3" />
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      <ScrollView 
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.mainWrapper}>
-          <Text style={styles.stepIndicator}>Step 4 of 6</Text>
-          
+        {/* Inner Form with Desktop support */}
+        <View style={styles.innerForm}>
+          <Text style={styles.stepIndicator}>STEP 4 OF 4</Text>
           <View style={styles.titleRow}>
             <Text style={styles.titleRegular}>Curate your </Text>
             <Text style={styles.titleItalic}>gallery</Text>
@@ -218,6 +242,7 @@ export default function PhotoUploadScreen({ route, navigation }) {
             Share your world. Profiles with at least 4 photos have a 70% higher match rate.
           </Text>
 
+          {/* Grid */}
           <View style={styles.grid}>
             {Array.from({ length: MAX_PHOTOS }).map((_, i) => {
               const hasPhoto = !!photos[i];
@@ -258,6 +283,7 @@ export default function PhotoUploadScreen({ route, navigation }) {
                       accessible={true}
                       accessibilityRole="button"
                       accessibilityLabel={`Remove photo ${i + 1}`}
+                      activeOpacity={0.7}
                     >
                       <Ionicons name="close" size={14} color="#FFFFFF" />
                     </TouchableOpacity>
@@ -267,6 +293,7 @@ export default function PhotoUploadScreen({ route, navigation }) {
             })}
           </View>
 
+          {/* Bio input */}
           <View style={styles.bioWrapper}>
             {!showBioInput ? (
               <TouchableOpacity 
@@ -275,6 +302,7 @@ export default function PhotoUploadScreen({ route, navigation }) {
                 accessible={true}
                 accessibilityRole="button"
                 accessibilityLabel="Add an editorial bio (optional)"
+                activeOpacity={0.75}
               >
                 <Ionicons name="document-text-outline" size={18} color="#E8628F" style={styles.bioIcon} />
                 <Text style={styles.bioButtonText}>Add an editorial bio (optional)</Text>
@@ -295,6 +323,7 @@ export default function PhotoUploadScreen({ route, navigation }) {
             )}
           </View>
 
+          {/* Pro tip card */}
           <View style={styles.tipCard}>
             <Ionicons name="sparkles" size={18} color="#E8628F" style={styles.tipIcon} />
             <View style={styles.tipContent}>
@@ -304,37 +333,38 @@ export default function PhotoUploadScreen({ route, navigation }) {
               </Text>
             </View>
           </View>
-        </View>
 
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.continueButton, (!isValid || submitting) && styles.continueButtonDisabled]}
-            disabled={!isValid || submitting}
-            onPress={() => finishOnboarding(bio)}
-            activeOpacity={isValid && !submitting ? 0.85 : 1}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Start swiping, finish onboarding"
-            accessibilityState={{ disabled: !isValid }}
-          >
-            <LinearGradient
-              colors={isValid && !submitting ? ['#E8628F', '#C53D6B'] : ['#3A1E4A', '#3A1E4A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.continueGradient}
+          {/* Action buttons */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.continueButton, (!isValid || submitting) && styles.continueButtonDisabled]}
+              disabled={!isValid || submitting}
+              onPress={() => finishOnboarding(bio)}
+              activeOpacity={isValid && !submitting ? 0.85 : 1}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Start swiping, finish onboarding"
+              accessibilityState={{ disabled: !isValid }}
             >
-              {submitting ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.continueButtonText}>START SWIPING  &gt;</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-          <Text style={styles.legalText}>
-            By continuing you agree to our Terms of Service
-          </Text>
+              <LinearGradient
+                colors={isValid && !submitting ? ['#E8628F', '#C53D6B'] : ['#3A1E4A', '#3A1E4A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.continueGradient}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.continueButtonText}>START SWIPING  &gt;</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+            <Text style={styles.legalText}>
+              By continuing you agree to our Terms of Service
+            </Text>
+          </View>
         </View>
-      </ScrollView>
+      </ResponsiveScreen>
     </View>
   );
 }
@@ -348,6 +378,8 @@ const createStyles = (Colors) => StyleSheet.create({
     width: '100%',
     backgroundColor: 'transparent',
     zIndex: 10,
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   progressContainer: {
     height: 4,
@@ -362,7 +394,7 @@ const createStyles = (Colors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base,
+    paddingHorizontal: 24,
     height: 56,
   },
   backBtn: {
@@ -372,6 +404,7 @@ const createStyles = (Colors) => StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   headerTitle: {
     fontSize: 22,
@@ -385,15 +418,16 @@ const createStyles = (Colors) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: Spacing.xl,
+
+  innerForm: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    paddingHorizontal: 24,
     paddingTop: Spacing.md,
-    justifyContent: 'space-between',
+    paddingBottom: Spacing.xl,
   },
-  mainWrapper: {
-    flex: 1,
-  },
+
   stepIndicator: {
     fontSize: 12,
     fontWeight: '700',
@@ -447,10 +481,12 @@ const createStyles = (Colors) => StyleSheet.create({
     alignItems: 'center', 
     justifyContent: 'center', 
     overflow: 'hidden',
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   slotFilled: {
     borderStyle: 'solid',
     borderColor: 'rgba(255, 255, 255, 0.3)',
+    ...Platform.select({ web: { cursor: 'default' } as any, default: {} })
   },
   photo: { 
     width: '100%', 
@@ -488,7 +524,8 @@ const createStyles = (Colors) => StyleSheet.create({
     alignItems: 'center', 
     justifyContent: 'center', 
     zIndex: 10, 
-    ...Shadow.sm 
+    ...Shadow.sm,
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   plus: { 
     fontSize: 24, 
@@ -509,6 +546,7 @@ const createStyles = (Colors) => StyleSheet.create({
     borderColor: 'rgba(232, 98, 143, 0.3)',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     paddingHorizontal: Spacing.base,
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   bioIcon: {
     marginRight: Spacing.sm,
@@ -567,10 +605,12 @@ const createStyles = (Colors) => StyleSheet.create({
     borderRadius: Radius.full,
     overflow: 'hidden',
     ...Shadow.md,
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   continueButtonDisabled: {
     shadowOpacity: 0,
     elevation: 0,
+    ...Platform.select({ web: { cursor: 'default' } as any, default: {} })
   },
   continueGradient: {
     height: 52,

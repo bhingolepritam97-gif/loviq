@@ -1,9 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Image } from 'react-native';
 import { Typography } from '../../theme';
 import { BrandAnimation } from '../../components/brand/brand';
-
-const { width, height } = Dimensions.get('window');
 
 export default function SplashScreen({ navigation }) {
   // Core animation values

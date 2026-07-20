@@ -1,20 +1,21 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ResponsiveContainer } from '../../core/responsive';
 import { Typography, Spacing, Radius, Shadow } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
 
-const { width } = Dimensions.get('window');
-
 export default function NewMatchCarouselScreen({ route, navigation }) {
+  const { width } = useWindowDimensions();
   const { colors: Colors } = useTheme();
-  const styles = createStyles(Colors);
+  const styles = createStyles(Colors, width);
   const insets = useSafeAreaInsets();
   const newMatches = route.params?.newMatches || [];
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
@@ -54,10 +55,11 @@ export default function NewMatchCarouselScreen({ route, navigation }) {
         />
       )}
     </View>
+    </ResponsiveContainer>
   );
 }
 
-const createStyles = (Colors) => StyleSheet.create({
+const createStyles = (Colors, width) => StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, height: 60, borderBottomWidth: 1, borderColor: Colors.border },
   backButton: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },

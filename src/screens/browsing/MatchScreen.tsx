@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Image, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Animated, Image, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Typography, Spacing, Radius, Gradients, Shadow } from '../../theme';
@@ -8,11 +8,13 @@ import Button from '../../components/Button';
 import { useAuth } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
-const { width } = Dimensions.get('window');
+import { ResponsiveContainer, useBreakpoints } from '../../core/responsive';
 
 export default function MatchScreen({ route, navigation }) {
+  const { width: windowWidth, isPhone } = useBreakpoints();
+  const containerWidth = isPhone ? windowWidth : 480;
   const { colors: Colors } = useTheme();
-  const styles = createStyles(Colors);
+  const styles = createStyles(windowWidth, Colors, isPhone);
   const insets = useSafeAreaInsets();
   const { matchProfile, matchId } = route.params || {};
   const { profile } = useAuth();
@@ -23,8 +25,8 @@ export default function MatchScreen({ route, navigation }) {
 
   const scale = useRef(new Animated.Value(0.3)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-  const leftCardPos = useRef(new Animated.Value(-width)).current;
-  const rightCardPos = useRef(new Animated.Value(width)).current;
+  const leftCardPos = useRef(new Animated.Value(-windowWidth)).current;
+  const rightCardPos = useRef(new Animated.Value(windowWidth)).current;
 
   // Floating animations for left and right avatars
   const floatLeft = useRef(new Animated.Value(0)).current;
@@ -37,7 +39,7 @@ export default function MatchScreen({ route, navigation }) {
   const heartsRef = useRef(
     Array.from({ length: 12 }).map((_, i) => ({
       y: new Animated.Value(0),
-      x: 30 + Math.random() * (width - 80),
+      x: 30 + Math.random() * (windowWidth - 80),
       xOffset: new Animated.Value(0),
       opacity: new Animated.Value(0),
       delay: i * 350,
@@ -131,7 +133,8 @@ export default function MatchScreen({ route, navigation }) {
   if (!profile) return null;
 
   return (
-    <View style={styles.container}>
+    <ResponsiveContainer>
+      <View style={styles.container}>
       {/* Background gradient */}
       <LinearGradient 
         colors={['#14051A', '#2D1030', '#14051A']} 
@@ -279,11 +282,14 @@ export default function MatchScreen({ route, navigation }) {
         </View>
       </Animated.View>
     </View>
+    </ResponsiveContainer>
   );
 }
 
-const createStyles = (Colors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#14051A' },
+const createStyles = (width: number, Colors: any, isPhone: boolean) => {
+  const containerWidth = isPhone ? width : 480;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#14051A' },
   content: { flex: 1, justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing['2xl'] },
   brandWordmark: {
     fontSize: 26,
@@ -324,7 +330,7 @@ const createStyles = (Colors) => StyleSheet.create({
   avatarContainer: {
     flexDirection: 'row',
     position: 'relative',
-    width: width * 0.8,
+    width: containerWidth * 0.8,
     height: 180,
     justifyContent: 'center',
     alignItems: 'center',
@@ -340,7 +346,7 @@ const createStyles = (Colors) => StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#1E0B26',
     position: 'absolute',
-    left: width * 0.15,
+    left: containerWidth * 0.15,
     zIndex: 10,
     ...Shadow.lg,
   },
@@ -353,7 +359,7 @@ const createStyles = (Colors) => StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#1E0B26',
     position: 'absolute',
-    right: width * 0.1,
+    right: containerWidth * 0.1,
     zIndex: 20,
     shadowColor: '#E8628F',
     shadowOffset: { width: 0, height: 8 },
@@ -365,7 +371,7 @@ const createStyles = (Colors) => StyleSheet.create({
   heartBadge: {
     position: 'absolute',
     bottom: 24,
-    left: width * 0.35,
+    left: containerWidth * 0.35,
     zIndex: 40,
     width: 44,
     height: 44,
@@ -473,3 +479,4 @@ const createStyles = (Colors) => StyleSheet.create({
     fontFamily: Typography.fontFamily.sansSerif,
   },
 });
+}

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ResponsiveContainer } from '../../core/responsive';
 import { Shadow, Spacing, Radius } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import Avatar from '../../components/Avatar';
@@ -23,16 +24,16 @@ try {
   console.warn("WebRTC native modules are not available in this runtime (likely running inside Expo Go). Calling screens will use fallback views.");
 }
 
-const { width } = Dimensions.get('window');
-
 export default function ActiveCallScreen({ route, navigation }) {
+  const { width } = useWindowDimensions();
   const { colors: Colors } = useTheme();
-  const styles = createStyles(Colors);
+  const styles = createStyles(Colors, width);
   const insets = useSafeAreaInsets();
 
   if (!hasWebRTC) {
     const { profile } = route.params || {};
     return (
+      <ResponsiveContainer safeArea={false} centered={false}>
       <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.background }]}>
         <Ionicons name="videocam-off-outline" size={64} color={Colors.primary} style={{ marginBottom: Spacing.lg }} />
         <Text style={{ fontSize: 22, fontWeight: '700', color: Colors.text, textAlign: 'center', marginBottom: Spacing.md }}>WebRTC Calling Unavailable</Text>
@@ -49,6 +50,7 @@ export default function ActiveCallScreen({ route, navigation }) {
           <Text style={{ color: Colors.white, fontWeight: '700', fontSize: 16 }}>Go Back</Text>
         </TouchableOpacity>
       </View>
+      </ResponsiveContainer>
     );
   }
   const { profile, callType = 'video', isInitiator = false, signalData } = route.params || {};
@@ -257,6 +259,7 @@ export default function ActiveCallScreen({ route, navigation }) {
   };
 
   return (
+    <ResponsiveContainer safeArea={false} centered={false}>
     <View style={styles.container}>
       {/* BACKGROUND / MAIN FEED */}
       {callType === 'video' && remoteStream ? (
@@ -310,10 +313,11 @@ export default function ActiveCallScreen({ route, navigation }) {
         </View>
       </LinearGradient>
     </View>
+    </ResponsiveContainer>
   );
 }
 
-const createStyles = (Colors) => StyleSheet.create({
+const createStyles = (Colors, width) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   mainVideo: { width: '100%', height: '100%', resizeMode: 'cover' },
   audioBg: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F0E1A' },

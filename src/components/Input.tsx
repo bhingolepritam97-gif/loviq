@@ -3,6 +3,8 @@ import { TextInput, View, Text, StyleSheet, TouchableOpacity } from 'react-nativ
 import { Typography, Spacing, Radius } from '../theme';
 import { useTheme } from '../context/ThemeContext';
 
+import { useBreakpoints } from '../core/responsive';
+
 /**
  * Input — styled text input
  * @param {string} label
@@ -40,11 +42,16 @@ export default function Input({
   ...props
 }: any) {
   const { colors: Colors } = useTheme();
+  const { isPhone } = useBreakpoints();
   const styles = createStyles(Colors);
   const [focused, setFocused] = React.useState(false);
 
   return (
-    <View style={[styles.wrapper, style]}>
+    <View style={[
+      styles.wrapper,
+      !isPhone && { maxWidth: 480, alignSelf: 'center' as any },
+      style
+    ]}>
       {!!label && <Text style={styles.label}>{label}</Text>}
       <View style={[
         styles.container,

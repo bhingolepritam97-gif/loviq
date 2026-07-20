@@ -3,10 +3,11 @@ const { requireAuth } = require("../middleware/auth");
 const ctrl = require("../controllers/usersController");
 
 const router = express.Router();
+const safetyMiddleware = require("../middleware/safetyMiddleware");
 
 router.patch("/me/push-token", requireAuth, ctrl.updatePushToken);
 router.get("/me", requireAuth, ctrl.getCurrentUser);
-router.patch("/me", requireAuth, ctrl.updateCurrentUser);
+router.patch("/me", requireAuth, safetyMiddleware.duplicateAccountCheck, ctrl.updateCurrentUser);
 router.post("/me/ai-suggestions", requireAuth, ctrl.getAiSuggestions);
 router.post("/me/verify-selfie", requireAuth, ctrl.verifySelfie);
 router.post("/me/generate-invite", requireAuth, ctrl.generateInvite);

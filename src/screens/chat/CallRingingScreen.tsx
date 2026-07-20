@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ResponsiveContainer } from '../../core/responsive';
 import { Typography, Spacing } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import Avatar from '../../components/Avatar';
@@ -66,6 +67,7 @@ export default function CallRingingScreen({ route, navigation }) {
   };
 
   return (
+    <ResponsiveContainer safeArea={false} centered={false}>
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
         <Text style={styles.callingText}>{isIncoming ? "Incoming call..." : "Ringing..."}</Text>
@@ -96,6 +98,7 @@ export default function CallRingingScreen({ route, navigation }) {
         )}
       </View>
     </View>
+    </ResponsiveContainer>
   );
 }
 

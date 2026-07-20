@@ -50,7 +50,13 @@ const RootStack = createStackNavigator();
 const navigationRef = React.createRef<NavigationContainerRef<any>>();
 
 const linking = {
-  prefixes: ['Lovly://', 'https://Lovlyapp.com'],
+  prefixes: [
+    'lovly://',
+    'Lovly://',
+    'https://loviq.vercel.app',
+    'https://lovlyapp.com',
+    'https://Lovlyapp.com',
+  ],
   config: {
     screens: {
       Main: {
@@ -216,12 +222,15 @@ export default function AppNavigator() {
           style={{ marginTop: Spacing.xl }} 
           onPress={async () => {
             try {
+              socketService.disconnect();
               if (user) {
                 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
                 await AsyncStorage.removeItem(`profileComplete_${user.uid}`);
               }
-            } catch (e) {
-              console.warn('Failed clearing profileComplete in AppNavigator logout:', e.message);
+              const { clearApiCache } = require('../api/client');
+              await clearApiCache();
+            } catch (e: any) {
+              console.warn('Failed clearing storage/cache in AppNavigator logout:', e.message);
             }
             await signOut(auth);
           }}

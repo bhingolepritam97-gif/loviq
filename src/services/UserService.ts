@@ -44,7 +44,12 @@ function mapBackendUserToProfile(u) {
     } : null,
     photos,
     isPremium: u.isPremium || false,
-    profileComplete: u.profileCompleted || false,
+    profileComplete: Boolean(
+      u.profileCompleted === true ||
+      u.profile_completed === true ||
+      u.profileComplete === true ||
+      (u.name && u.gender && ((photos && photos.length > 0) || u.birthdate))
+    ),
     isVerified: u.isVerified || false,
     cityName: u.cityName || '',
     isActive: u.isActive !== undefined ? u.isActive : (u.is_active !== undefined ? u.is_active : true),
@@ -70,17 +75,145 @@ function mapBackendUserToProfile(u) {
   };
 }
 
-export const getUserProfile = async (uid) => {
+// ── Firestore users/{uid} helpers ─────────────────────────────────────────
+// These write to the spec-required users/{uid} collection (separate from the
+// proximity-query profiles/{uid} collection already synced by updateUserProfile).
+
+/**
+ * ensureUserDocument — called once on every login via onAuthStateChanged.
+ * Creates users/{uid} with profileCompleted=false if it doesn't exist yet.
+ * Uses merge:true so it never overwrites a fully-filled document.
+ */
+export const ensureUserDocument = async (uid: string, firebaseUser: any): Promise<void> => {
+  if (!uid || !db) return;
+  try {
+    const { getDoc } = await import('firebase/firestore');
+    const docRef = doc(db, 'users', uid);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      // First login — seed the document
+      await setDoc(docRef, {
+        uid,
+        email: firebaseUser?.email || '',
+        phone: firebaseUser?.phoneNumber || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        profileCompleted: false,
+        verificationStatus: 'pending',
+        online: true,
+      });
+      console.log('[UserService] ✅ Firestore users/' + uid + ' created (first login).');
+    } else {
+      // Existing user — just mark them online
+      const { updateDoc } = await import('firebase/firestore');
+      await updateDoc(docRef, { online: true, updatedAt: new Date().toISOString() });
+      console.log('[UserService] ✅ Firestore users/' + uid + ' found (existing user). online=true.');
+    }
+  } catch (err: any) {
+    // Non-critical — never block the auth flow
+    console.warn('[UserService] ensureUserDocument failed (non-critical):', err.message);
+  }
+};
+
+/**
+ * syncUserDocumentOnComplete — called from PhotoUploadScreen after successful profile creation.
+ * Writes all spec-required fields to users/{uid} and sets profileCompleted=true.
+ */
+export const syncUserDocumentOnComplete = async (uid: string, profile: any): Promise<void> => {
+  if (!uid || !db) return;
+  try {
+    const payload: any = {
+      uid,
+      firstName: profile.name || profile.firstName || '',
+      birthday: profile.birthdate || '',
+      gender: profile.gender || '',
+      interestedIn: profile.interestedIn || profile.genderPreference?.[0] || 'Everyone',
+      bio: profile.bio || '',
+      photos: profile.photos || [],
+      interests: profile.interests || [],
+      preferences: {
+        ageMin: profile.ageMin ?? 18,
+        ageMax: profile.ageMax ?? 65,
+        maxDistanceKm: profile.maxDistanceKm ?? 80.5,
+        interestedIn: profile.interestedIn || 'Everyone',
+      },
+      profileCompleted: true,
+      verificationStatus: 'pending',
+      online: true,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (profile.location?.latitude != null) {
+      payload.location = {
+        latitude: profile.location.latitude,
+        longitude: profile.location.longitude,
+        cityName: profile.location.cityName || profile.cityName || '',
+      };
+    } else if (profile.latitude != null) {
+      payload.location = {
+        latitude: profile.latitude,
+        longitude: profile.longitude,
+        cityName: profile.cityName || '',
+      };
+    }
+
+    await setDoc(doc(db, 'users', uid), payload, { merge: true });
+    console.log('[UserService] ✅ Firestore users/' + uid + ' synced — profileCompleted=true.');
+    console.log('[UserService] 🎉 Profile Completed — all onboarding fields written to Firestore.');
+  } catch (err: any) {
+    // Non-critical — profile is already saved in REST backend
+    console.warn('[UserService] syncUserDocumentOnComplete failed (non-critical):', err.message);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getUserProfile = async (uid: string) => {
   try {
     const response = await apiClient('/users/me', { cache: true, ttl: 300000 });
-    if (response.success && response.user) {
+    if (response?.success && response?.user) {
       return mapBackendUserToProfile(response.user);
     }
-    return null;
-  } catch (err) {
-    console.warn('Error fetching user profile from backend REST API:', err.message);
-    throw err;
+  } catch (err: any) {
+    console.warn('[UserService] REST /users/me fetch failed, checking Firestore fallback for uid ' + uid + ':', err.message);
   }
+
+  // Fallback: Fetch directly from Firestore users/{uid}
+  if (uid && db) {
+    try {
+      const { getDoc } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const photos = data.photos || [];
+        const isComplete = Boolean(
+          data.profileCompleted === true ||
+          data.profileComplete === true ||
+          (data.firstName || data.name) && data.gender && (photos.length > 0 || data.birthday || data.birthdate)
+        );
+        return {
+          id: uid,
+          firebaseUid: uid,
+          name: data.firstName || data.name || '',
+          displayName: data.firstName || data.name || '',
+          gender: data.gender || '',
+          interestedIn: data.interestedIn || 'Everyone',
+          bio: data.bio || '',
+          interests: data.interests || [],
+          photos: photos,
+          isPremium: data.isPremium || false,
+          profileComplete: isComplete,
+          isVerified: data.verificationStatus === 'approved',
+          location: data.location || null,
+        };
+      }
+    } catch (fsErr: any) {
+      console.warn('[UserService] Firestore fallback failed:', fsErr.message);
+    }
+  }
+
+  return null;
 };
 
 export const fetchUserProfile = async (uid) => {
@@ -167,26 +300,24 @@ export const updateUserProfile = async (uid, data) => {
     if (response.success && response.user) {
       const mapped = mapBackendUserToProfile(response.user);
 
-      // ── Firestore geohash write (fire-and-forget) ───────────────────────
-      // The client-side EmptyStateScreen fallback (profileFeedLogic.js) uses
-      // geofire-common geohash queries against the Firestore `profiles` collection.
-      // We keep that field in sync here so the fallback always has accurate data.
-      if (lat !== undefined && lng !== undefined && uid && db) {
-        const geohash = geohashForLocation([lat, lng]);
-        setDoc(
-          doc(db, 'profiles', uid),
-          {
-            location: {
-              latitude: lat,
-              longitude: lng,
-              geohash,
-            },
-            ...(city !== undefined ? { cityName: city } : {}),
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        ).catch((err) =>
-          console.warn('[UserService] Firestore geohash write failed (non-critical):', err.message)
+      // ── Firestore profile sync (fire-and-forget) ──────────────────────
+      // profiles/{uid} is queried by the proximity feed fallback. We always
+      // write core fields so the doc exists even if location is not granted.
+      if (uid && db) {
+        const firestorePayload: any = {
+          name: mapped.name || '',
+          photos: mapped.photos || [],
+          profileCompleted: mapped.profileComplete || false,
+          updatedAt: new Date().toISOString(),
+        };
+        if (lat !== undefined && lng !== undefined) {
+          const geohash = geohashForLocation([lat, lng]);
+          firestorePayload.location = { latitude: lat, longitude: lng, geohash };
+          if (city !== undefined) firestorePayload.cityName = city;
+        }
+        console.log('[UserService] Writing Firestore profiles/', uid, 'fields:', Object.keys(firestorePayload));
+        setDoc(doc(db, 'profiles', uid), firestorePayload, { merge: true }).catch((err) =>
+          console.warn('[UserService] Firestore profile sync failed (non-critical):', err.message)
         );
       }
 

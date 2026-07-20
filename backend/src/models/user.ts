@@ -272,6 +272,31 @@ const User = sequelize.define(
       allowNull: true,
       field: 'looking_for',
     },
+    // --- Trust & Safety ---
+    strikes: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+    isShadowBanned: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: 'is_shadow_banned',
+    },
+    shadowBannedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'shadow_banned_at',
+    },
+    deviceFingerprint: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'device_fingerprint',
+    },
+    lastIpAddress: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'last_ip_address',
+    },
   },
   {
     tableName: "users",

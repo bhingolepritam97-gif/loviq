@@ -9,6 +9,7 @@ import PasswordScreen from '../screens/onboarding/PasswordScreen';
 import BasicInfoScreen from '../screens/onboarding/BasicInfoScreen';
 import PreferencesScreen from '../screens/onboarding/PreferencesScreen';
 import InterestsScreen from '../screens/onboarding/InterestsScreen';
+import LocationPermissionScreen from '../screens/onboarding/LocationPermissionScreen';
 import PhotoUploadScreen from '../screens/onboarding/PhotoUploadScreen';
 
 const Stack = createStackNavigator();
@@ -24,6 +25,7 @@ export default function OnboardingNavigator({ initialRouteName = 'Splash' }) {
       <Stack.Screen name="BasicInfo" component={BasicInfoScreen} />
       <Stack.Screen name="Preferences" component={PreferencesScreen} />
       <Stack.Screen name="Interests" component={InterestsScreen} />
+      <Stack.Screen name="LocationPermission" component={LocationPermissionScreen} />
       <Stack.Screen name="PhotoUpload" component={PhotoUploadScreen} />
     </Stack.Navigator>
   );

@@ -8,11 +8,13 @@ import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import ProfileScoreCard from '../../components/ProfileScoreCard';
+import { ResponsiveContainer, useBreakpoints } from '../../core/responsive';
 
 export default function MyProfileScreen({ navigation }) {
   const { colors: Colors } = useTheme();
   const styles = createStyles(Colors);
   const insets = useSafeAreaInsets();
+  const { isPhone } = useBreakpoints();
   const isFocused = useIsFocused();
   const { profile } = useAuth();
 
@@ -53,267 +55,291 @@ export default function MyProfileScreen({ navigation }) {
         { promptQuestion: 'My simple pleasures...', answerText: 'The smell of fresh jasmine and the first espresso on a Saturday morning.' }
       ];
 
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Top Header Bar */}
-      <View style={styles.topBar}>
-        <Text style={styles.barBrand}>Lovly</Text>
+  const renderProfileSummary = () => (
+    <View style={styles.profileSummaryCol}>
+      {/* Large Hero Asymmetric Photo */}
+      <TouchableOpacity 
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('ManagePhotos')}
+        style={styles.heroWrap}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel="Manage Profile Photos"
+      >
+        {profile?.photos?.[0] ? (
+          <Image source={{ uri: profile.photos[0] }} style={styles.heroAvatar as any} />
+        ) : (
+          <View style={styles.heroAvatarFallback}>
+            <Text style={styles.fallbackLetter}>
+              {profile?.name ? profile.name.charAt(0).toUpperCase() : '?'}
+            </Text>
+          </View>
+        )}
+        <View style={styles.editBadge}>
+          <Ionicons name="camera" size={16} color="#FFFFFF" />
+        </View>
+      </TouchableOpacity>
+
+      {/* Profile Info block */}
+      <View style={styles.infoSection}>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>
+            {profile?.name || 'Elena'}{profile?.age ? `, ${profile.age}` : ''}
+          </Text>
+          {profile?.isVerified && (
+            <Ionicons name="checkmark-circle" size={20} color="#E8628F" style={{ marginLeft: Spacing.xs }} />
+          )}
+        </View>
+        <Text style={styles.jobText}>{profile?.job || 'Interior Designer'}</Text>
+        {profile?.cityName && (
+          <Text style={styles.locationText}>📍 {profile.cityName}</Text>
+        )}
+        
+        {/* Preview my profile */}
         <TouchableOpacity 
-          accessible={true} 
-          accessibilityRole="button" 
-          accessibilityLabel="Go to settings" 
-          onPress={() => navigation.navigate('Settings')}
-          style={styles.settingsIconBtn}
+          onPress={() => navigation.navigate('ProfileDetail', { profile: { ...profile, id: profile?.id || profile?.uid } })}
+          style={styles.previewButton}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Preview my profile"
         >
-          <Ionicons name="settings-outline" size={22} color={Colors.text} />
+          <Ionicons name="eye-outline" size={14} color="#E8628F" style={{ marginRight: 6 }} />
+          <Text style={styles.previewButtonText}>Preview my profile</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Large Hero Asymmetric Photo */}
+      {/* Edit and Settings Actions Row */}
+      <View style={styles.editRow}>
         <TouchableOpacity 
-          activeOpacity={0.9}
-          onPress={() => navigation.navigate('ManagePhotos')}
-          style={styles.heroWrap}
+          activeOpacity={0.85} 
+          style={styles.editBtn}
+          onPress={() => navigation.navigate('EditProfile')}
           accessible={true}
           accessibilityRole="button"
-          accessibilityLabel="Manage Profile Photos"
+          accessibilityLabel="Edit profile details"
         >
-          {profile?.photos?.[0] ? (
-            <Image source={{ uri: profile.photos[0] }} style={styles.heroAvatar as any} />
-          ) : (
-            <View style={styles.heroAvatarFallback}>
-              <Text style={styles.fallbackLetter}>
-                {profile?.name ? profile.name.charAt(0).toUpperCase() : '?'}
-              </Text>
-            </View>
-          )}
-          <View style={styles.editBadge}>
-            <Ionicons name="camera" size={16} color="#FFFFFF" />
-          </View>
-        </TouchableOpacity>
-
-        {/* Profile Info block */}
-        <View style={styles.infoSection}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name}>
-              {profile?.name || 'Elena'}{profile?.age ? `, ${profile.age}` : ''}
-            </Text>
-            {profile?.isVerified && (
-              <Ionicons name="checkmark-circle" size={20} color="#E8628F" style={{ marginLeft: Spacing.xs }} />
-            )}
-          </View>
-          <Text style={styles.jobText}>{profile?.job || 'Interior Designer'}</Text>
-          {profile?.cityName && (
-            <Text style={styles.locationText}>📍 {profile.cityName}</Text>
-          )}
-          
-          {/* Preview my profile */}
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('ProfileDetail', { profile: { ...profile, id: profile?.id || profile?.uid } })}
-            style={styles.previewButton}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Preview my profile"
+          <LinearGradient
+            colors={Gradients.primary.colors}
+            start={Gradients.primary.start}
+            end={Gradients.primary.end}
+            style={styles.editGradient}
           >
-            <Ionicons name="eye-outline" size={14} color="#E8628F" style={{ marginRight: 6 }} />
-            <Text style={styles.previewButtonText}>Preview my profile</Text>
-          </TouchableOpacity>
-        </View>
+            <Text style={styles.editBtnText}>Edit Profile</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.gearBtn}
+          onPress={() => navigation.navigate('Preferences')}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Dating preferences"
+        >
+          <Ionicons name="options-outline" size={20} color={Colors.text} />
+        </TouchableOpacity>
+      </View>
 
-        {/* Edit and Settings Actions Row */}
-        <View style={styles.editRow}>
+      {/* Profile Completeness Score Card */}
+      <View style={{ paddingHorizontal: Spacing.xl, marginBottom: Spacing.xl }}>
+        <ProfileScoreCard
+          profile={profile}
+          style={{ width: '100%' }}
+          onItemPress={(route) => navigation.navigate(route)}
+        />
+      </View>
+    </View>
+  );
+
+  const renderProfileDetails = () => (
+    <View style={styles.profileDetailsCol}>
+      {/* Life Moments Horizontal Scroll */}
+      <View style={styles.momentsSection}>
+        <Text style={styles.sectionHeading}>Life Moments</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.momentsScroll}>
+          {lifeMoments.map((photoUrl, idx) => (
+            <View key={`moment-${idx}`} style={styles.momentCard}>
+              <Image source={{ uri: photoUrl }} style={styles.momentImage as any} />
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Prompts Section */}
+      <View style={styles.promptsSection}>
+        {demoPrompts.map((pa, idx) => (
+          <View key={`prompt-${idx}`} style={styles.promptCard}>
+            <Text style={styles.promptQuestion}>{pa.promptQuestion || pa.prompt?.questionText}</Text>
+            <Text style={styles.promptAnswer}>{pa.answerText}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* The Vibe (Interests) Section */}
+      <View style={styles.vibeSection}>
+        <Text style={styles.sectionHeading}>The Vibe</Text>
+        <View style={styles.vibeChips}>
+          {(profile?.interests && profile.interests.length > 0 ? profile.interests : ['Fine Art', 'Vinyl', 'Late Night Jazz', 'Architecture', 'Mid-century Modern']).map((tag, idx) => (
+            <View key={`vibe-${idx}`} style={styles.vibeChip}>
+              <Text style={styles.vibeChipText}>{tag}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Premium Promo Card (Gold Dark Card styling) */}
+      <TouchableOpacity 
+        style={styles.premiumPromo} 
+        onPress={() => navigation.navigate('Premium')}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel="Upgrade your picks"
+      >
+        <LinearGradient
+          colors={['#1F0A27', '#14051A']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.premiumGradient}
+        >
+          <Text style={styles.premiumPromoLabel}>⭐ LOVLY GOLD</Text>
+          <Text style={styles.premiumPromoTitle}>Unlock Elena's Top Picks</Text>
+          <Text style={styles.premiumPromoSubtitle}>
+            See who is showing interest and get priority in discovery feed.
+          </Text>
           <TouchableOpacity 
-            activeOpacity={0.85} 
-            style={styles.editBtn}
-            onPress={() => navigation.navigate('EditProfile')}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Edit profile details"
+            style={styles.premiumPromoBtn}
+            onPress={() => navigation.navigate('Premium')}
           >
             <LinearGradient
               colors={Gradients.primary.colors}
               start={Gradients.primary.start}
               end={Gradients.primary.end}
-              style={styles.editGradient}
+              style={styles.premiumPromoBtnGradient}
             >
-              <Text style={styles.editBtnText}>Edit Profile</Text>
+              <Text style={styles.premiumPromoBtnText}>Upgrade Now</Text>
             </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.gearBtn}
-            onPress={() => navigation.navigate('Preferences')}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Dating preferences"
-          >
-            <Ionicons name="options-outline" size={20} color={Colors.text} />
-          </TouchableOpacity>
-        </View>
+        </LinearGradient>
+      </TouchableOpacity>
 
-        {/* Profile Completeness Score Card */}
-        <View style={{ paddingHorizontal: Spacing.xl, marginBottom: Spacing.xl }}>
-          <ProfileScoreCard
-            profile={profile}
-            style={{ width: '100%' }}
-            onItemPress={(route) => navigation.navigate(route)}
-          />
-        </View>
-
-        {/* Life Moments Horizontal Scroll */}
-        <View style={styles.momentsSection}>
-          <Text style={styles.sectionHeading}>Life Moments</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.momentsScroll}>
-            {lifeMoments.map((photoUrl, idx) => (
-              <View key={`moment-${idx}`} style={styles.momentCard}>
-                <Image source={{ uri: photoUrl }} style={styles.momentImage as any} />
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Prompts Section */}
-        <View style={styles.promptsSection}>
-          {demoPrompts.map((pa, idx) => (
-            <View key={`prompt-${idx}`} style={styles.promptCard}>
-              <Text style={styles.promptQuestion}>{pa.promptQuestion || pa.prompt?.questionText}</Text>
-              <Text style={styles.promptAnswer}>{pa.answerText}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* The Vibe (Interests) Section */}
-        <View style={styles.vibeSection}>
-          <Text style={styles.sectionHeading}>The Vibe</Text>
-          <View style={styles.vibeChips}>
-            {(profile?.interests && profile.interests.length > 0 ? profile.interests : ['Fine Art', 'Vinyl', 'Late Night Jazz', 'Architecture', 'Mid-century Modern']).map((tag, idx) => (
-              <View key={`vibe-${idx}`} style={styles.vibeChip}>
-                <Text style={styles.vibeChipText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Premium Promo Card (Gold Dark Card styling) */}
+      {/* Quick Utilities List */}
+      <View style={styles.utilitySection}>
+        {/* View Insights / Analytics */}
         <TouchableOpacity 
-          style={styles.premiumPromo} 
-          onPress={() => navigation.navigate('Premium')}
+          style={styles.utilityRow} 
+          onPress={() => navigation.navigate('Analytics')}
           accessible={true}
           accessibilityRole="button"
-          accessibilityLabel="Upgrade your picks"
+          accessibilityLabel="View Profile Insights"
+        >
+          <View style={styles.utilityLeft}>
+            <Ionicons name="bar-chart-outline" size={20} color={Colors.text} style={styles.utilityIcon} />
+            <Text style={styles.utilityLabel}>View Profile Insights</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* Profile Boost Row */}
+        <TouchableOpacity 
+          style={[styles.utilityRow, { borderBottomWidth: 0 }]} 
+          onPress={activateBoost}
+          activeOpacity={boostSeconds > 0 ? 1 : 0.7}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel={boostSeconds > 0 ? "Boost is active" : "Boost your profile"}
+        >
+          <View style={styles.utilityLeft}>
+            <Ionicons 
+              name="rocket-outline" 
+              size={20} 
+              color={boostSeconds > 0 ? '#E8628F' : Colors.text} 
+              style={styles.utilityIcon} 
+            />
+            <View>
+              <Text style={[styles.utilityLabel, boostSeconds > 0 && { color: '#E8628F', fontWeight: '700' }]}>
+                {boostSeconds > 0 ? 'Profile Boost Active!' : 'Boost Your Profile'}
+              </Text>
+              {boostSeconds > 0 ? (
+                <Text style={styles.boostSub}>
+                  Extra visibility for {formatBoostTime(boostSeconds)} remaining
+                </Text>
+              ) : (
+                <Text style={styles.boostSub}>
+                  Be seen by up to 10x more people for 30 minutes
+                </Text>
+              )}
+            </View>
+          </View>
+          {boostSeconds === 0 && (
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Verification Card (Selfie verification) */}
+      {!profile?.isVerified && (
+        <TouchableOpacity 
+          style={styles.verifyCard} 
+          onPress={() => navigation.navigate('PhotoVerification')}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Get Verified"
         >
           <LinearGradient
             colors={['#1F0A27', '#14051A']}
+            style={styles.verifyGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.premiumGradient}
           >
-            <Text style={styles.premiumPromoLabel}>⭐ LOVLY GOLD</Text>
-            <Text style={styles.premiumPromoTitle}>Unlock Elena's Top Picks</Text>
-            <Text style={styles.premiumPromoSubtitle}>
-              See who is showing interest and get priority in discovery feed.
-            </Text>
-            <TouchableOpacity 
-              style={styles.premiumPromoBtn}
-              onPress={() => navigation.navigate('Premium')}
-            >
-              <LinearGradient
-                colors={Gradients.primary.colors}
-                start={Gradients.primary.start}
-                end={Gradients.primary.end}
-                style={styles.premiumPromoBtnGradient}
-              >
-                <Text style={styles.premiumPromoBtnText}>Upgrade Now</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            <View style={styles.verifyHeaderRow}>
+              <Ionicons name="shield-checkmark" size={20} color="#E8628F" style={{ marginRight: 8 }} />
+              <Text style={styles.verifyTitle}>Get Verified</Text>
+            </View>
+            <Text style={styles.verifyText}>Prove it's you to get a blue checkmark and increase matches by 200%!</Text>
           </LinearGradient>
         </TouchableOpacity>
+      )}
 
-        {/* Quick Utilities List */}
-        <View style={styles.utilitySection}>
-          {/* View Insights / Analytics */}
-          <TouchableOpacity 
-            style={styles.utilityRow} 
-            onPress={() => navigation.navigate('Analytics')}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="View Profile Insights"
-          >
-            <View style={styles.utilityLeft}>
-              <Ionicons name="bar-chart-outline" size={20} color={Colors.text} style={styles.utilityIcon} />
-              <Text style={styles.utilityLabel}>View Profile Insights</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
-
-          {/* Profile Boost Row */}
-          <TouchableOpacity 
-            style={[styles.utilityRow, { borderBottomWidth: 0 }]} 
-            onPress={activateBoost}
-            activeOpacity={boostSeconds > 0 ? 1 : 0.7}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel={boostSeconds > 0 ? "Boost is active" : "Boost your profile"}
-          >
-            <View style={styles.utilityLeft}>
-              <Ionicons 
-                name="rocket-outline" 
-                size={20} 
-                color={boostSeconds > 0 ? '#E8628F' : Colors.text} 
-                style={styles.utilityIcon} 
-              />
-              <View>
-                <Text style={[styles.utilityLabel, boostSeconds > 0 && { color: '#E8628F', fontWeight: '700' }]}>
-                  {boostSeconds > 0 ? 'Profile Boost Active!' : 'Boost Your Profile'}
-                </Text>
-                {boostSeconds > 0 ? (
-                  <Text style={styles.boostSub}>
-                    Extra visibility for {formatBoostTime(boostSeconds)} remaining
-                  </Text>
-                ) : (
-                  <Text style={styles.boostSub}>
-                    Be seen by up to 10x more people for 30 minutes
-                  </Text>
-                )}
-              </View>
-            </View>
-            {boostSeconds === 0 && (
-              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Verification Card (Selfie verification) */}
-        {!profile?.isVerified && (
-          <TouchableOpacity 
-            style={styles.verifyCard} 
-            onPress={() => navigation.navigate('PhotoVerification')}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Get Verified"
-          >
-            <LinearGradient
-              colors={['#1F0A27', '#14051A']}
-              style={styles.verifyGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <View style={styles.verifyHeaderRow}>
-                <Ionicons name="shield-checkmark" size={20} color="#E8628F" style={{ marginRight: 8 }} />
-                <Text style={styles.verifyTitle}>Get Verified</Text>
-              </View>
-              <Text style={styles.verifyText}>Prove it's you to get a blue checkmark and increase matches by 200%!</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
-
-        {/* Safety Section */}
-        <View style={styles.safetyCard}>
-          <Text style={styles.safetyTitle}>Safety Center 🛡️</Text>
-          <Text style={styles.safetyText}>Tips and guidelines for matches, safety settings, and community standards.</Text>
-        </View>
-      </ScrollView>
+      {/* Safety Section */}
+      <View style={styles.safetyCard}>
+        <Text style={styles.safetyTitle}>Safety Center 🛡️</Text>
+        <Text style={styles.safetyText}>Tips and guidelines for matches, safety settings, and community standards.</Text>
+      </View>
     </View>
+  );
+
+  return (
+    <ResponsiveContainer safeArea={false}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        {/* Top Header Bar */}
+        <View style={styles.topBar}>
+          <Text style={styles.barBrand}>Lovly</Text>
+          <TouchableOpacity 
+            accessible={true} 
+            accessibilityRole="button" 
+            accessibilityLabel="Go to settings" 
+            onPress={() => navigation.navigate('Settings')}
+            style={styles.settingsIconBtn}
+          >
+            <Ionicons name="settings-outline" size={22} color={Colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        {isPhone ? (
+          <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+            {renderProfileSummary()}
+            {renderProfileDetails()}
+          </ScrollView>
+        ) : (
+          <View style={styles.splitWrapper}>
+            <ScrollView style={styles.leftPane} showsVerticalScrollIndicator={false}>
+              {renderProfileSummary()}
+            </ScrollView>
+            <ScrollView style={styles.rightPane} showsVerticalScrollIndicator={false}>
+              {renderProfileDetails()}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+    </ResponsiveContainer>
   );
 }
 
@@ -520,11 +546,11 @@ const createStyles = (Colors) => StyleSheet.create({
   
   // Premium Card
   premiumPromo: {
-    width: width - 32,
+    marginHorizontal: Spacing.xl,
+    alignSelf: 'stretch',
     borderRadius: Radius['2xl'],
     overflow: 'hidden',
     marginBottom: Spacing.xl,
-    alignSelf: 'center',
     ...Shadow.md,
   },
   premiumGradient: {
@@ -572,13 +598,13 @@ const createStyles = (Colors) => StyleSheet.create({
   },
   
   safetyCard: {
-    width: width - 32,
+    marginHorizontal: Spacing.xl,
     backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
     padding: 18,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    alignSelf: 'center',
+    alignSelf: 'stretch',
     marginBottom: 40,
   },
   safetyTitle: {
@@ -629,12 +655,12 @@ const createStyles = (Colors) => StyleSheet.create({
 
   // Utility List Row Styles
   utilitySection: {
-    width: width - 32,
+    marginHorizontal: Spacing.xl,
     backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    alignSelf: 'center',
+    alignSelf: 'stretch',
     paddingHorizontal: Spacing.md,
     marginBottom: Spacing.xl,
     overflow: 'hidden',
@@ -671,10 +697,10 @@ const createStyles = (Colors) => StyleSheet.create({
 
   // Verification Card
   verifyCard: {
-    width: width - 32,
+    marginHorizontal: Spacing.xl,
     borderRadius: Radius.xl,
     overflow: 'hidden',
-    alignSelf: 'center',
+    alignSelf: 'stretch',
     marginBottom: Spacing.xl,
     ...Shadow.md,
   },
@@ -699,4 +725,9 @@ const createStyles = (Colors) => StyleSheet.create({
     lineHeight: 17,
     fontFamily: Typography.fontFamily.sansSerif,
   },
+  splitWrapper: { flex: 1, flexDirection: 'row', gap: Spacing.lg, paddingHorizontal: Spacing.xl },
+  leftPane: { width: 340, flex: 0, borderRightWidth: 1, borderRightColor: Colors.border, paddingRight: Spacing.lg },
+  rightPane: { flex: 1, paddingLeft: Spacing.lg },
+  profileSummaryCol: { width: '100%' },
+  profileDetailsCol: { width: '100%' },
 });

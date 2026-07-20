@@ -9,6 +9,7 @@ import { Typography, Spacing, Radius, Shadow } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { getBlockedUsers, blockUser, unblockUser } from '../../services/UserService';
+import { ResponsiveContainer } from '../../core/responsive';
 
 export default function BlockedContactsScreen({ navigation }) {
   const { colors: Colors } = useTheme();
@@ -106,6 +107,7 @@ export default function BlockedContactsScreen({ navigation }) {
   };
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
@@ -198,6 +200,7 @@ export default function BlockedContactsScreen({ navigation }) {
         />
       )}
     </View>
+    </ResponsiveContainer>
   );
 }
 

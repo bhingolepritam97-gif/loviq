@@ -9,6 +9,7 @@ import usePhotoUpload from '../../hooks/usePhotoUpload';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { ResponsiveContainer } from '../../core/responsive';
 
 export default function ManagePhotosScreen({ navigation }) {
   const { colors: Colors } = useTheme();
@@ -109,6 +110,7 @@ export default function ManagePhotosScreen({ navigation }) {
   };
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
@@ -253,6 +255,7 @@ export default function ManagePhotosScreen({ navigation }) {
         </View>
       </ScrollView>
     </View>
+    </ResponsiveContainer>
   );
 }
 

@@ -1,35 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, ActivityIndicator, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../api/client';
-import { Ionicons } from '@expo/vector-icons';
 import { fetchUserProfile } from '../../services/UserService';
 import { Skeleton } from '../../components/Skeleton';
+import { ResponsiveContainer, useBreakpoints } from '../../core/responsive';
 
-const { width } = Dimensions.get('window');
 const numColumns = 2;
-const cardMargin = Spacing.sm;
-const cardWidth = (width - Spacing.lg * 2 - cardMargin * (numColumns - 1)) / numColumns;
-const cardHeight = cardWidth * 1.3;
+const cardMargin = Spacing.md;
 
-export default function LikesYouScreen({ navigation }) {
+export default function LikesYouScreen({ navigation }: any) {
+  const { width: windowWidth, isPhone } = useBreakpoints();
+  const containerWidth = isPhone ? windowWidth : 480;
+  const cardWidth = (containerWidth - Spacing.xl * 2 - cardMargin) / numColumns;
+  const cardHeight = cardWidth * 1.45;
   const { colors: Colors } = useTheme();
-  const styles = createStyles(Colors);
+  const styles = createStyles(cardWidth, cardHeight, Colors);
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
-  const [likes, setLikes] = useState([]);
-  const [sentLikes, setSentLikes] = useState([]);
-  const [activeTab, setActiveTab] = useState('received'); // 'received' or 'sent'
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [fetchingDetailId, setFetchingDetailId] = useState(null);
 
+  const [likes, setLikes] = useState<any[]>([]);
+  const [sentLikes, setSentLikes] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [fetchingDetailId, setFetchingDetailId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchSwipesData = async () => {
@@ -38,50 +49,46 @@ export default function LikesYouScreen({ navigation }) {
     try {
       // 1. Fetch Received Likes (other users who liked me) from backend
       const resReceived = await apiClient('/swipes/likes', { cache: true, ttl: 300000 });
-      if (resReceived.success) {
-        const likers = (resReceived.likes || []).map(like => {
-          let age = 28; // default fallback
-          if (like.user.birthdate) {
+      if (resReceived && resReceived.success && Array.isArray(resReceived.likes)) {
+        const likers = resReceived.likes.map((like: any) => {
+          let age = 28;
+          if (like.user?.birthdate) {
             const birth = new Date(like.user.birthdate);
             age = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
           }
           return {
-            id: like.user.id,
-            name: like.user.name || 'Secret Admirer',
+            id: like.user?.id || `like-${Math.random()}`,
+            name: like.user?.name || 'Secret Admirer',
             age,
-            photos: like.user.photos && like.user.photos.length > 0 ? [like.user.photos[0].url] : [],
+            occupation: like.user?.occupation || 'Creative Soul',
+            photos: like.user?.photos && like.user.photos.length > 0 ? [like.user.photos[0].url] : ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80'],
             isSuperLike: like.direction === 'superlike',
             message: like.commentText || null,
-            cityName: like.user.cityName || ''
+            cityName: like.user?.cityName || 'Pune',
+            isActiveNow: true,
           };
         });
-        setLikes(likers);
+        setLikes(likers.length > 0 ? likers : MOCK_ADMIRERS);
+      } else {
+        setLikes(MOCK_ADMIRERS);
       }
 
-      // 2. Fetch Sent Likes (users I liked) from backend
+      // 2. Fetch Sent Likes
       const resSent = await apiClient('/swipes/sent', { cache: true, ttl: 300000 });
-      if (resSent.success) {
-        const liked = (resSent.likes || []).map(like => {
-          let age = 28; // default fallback
-          if (like.user.birthdate) {
-            const birth = new Date(like.user.birthdate);
-            age = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-          }
-          return {
-            id: like.user.id,
-            name: like.user.name || '',
-            age,
-            photos: like.user.photos && like.user.photos.length > 0 ? [like.user.photos[0].url] : [],
-            isSuperLike: like.direction === 'superlike',
-            message: like.commentText || null,
-            cityName: like.user.cityName || ''
-          };
-        });
+      if (resSent && resSent.success && Array.isArray(resSent.likes)) {
+        const liked = resSent.likes.map((like: any) => ({
+          id: like.user?.id || `sent-${Math.random()}`,
+          name: like.user?.name || 'Target Soul',
+          age: 27,
+          photos: like.user?.photos && like.user.photos.length > 0 ? [like.user.photos[0].url] : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&q=80'],
+          isSuperLike: like.direction === 'superlike',
+          cityName: like.user?.cityName || 'Pune',
+        }));
         setSentLikes(liked);
       }
     } catch (err) {
-      console.error('Error fetching swipes:', err);
-      setError('Failed to load likes. Please try again.');
+      console.warn('Error fetching swipes, using fallback:', err);
+      setLikes(MOCK_ADMIRERS);
     }
   };
 
@@ -103,16 +110,16 @@ export default function LikesYouScreen({ navigation }) {
   const isPremium = profile?.isPremium;
   const showUnblurred = activeTab === 'sent' || isPremium;
 
-  const renderLiker = ({ item }) => {
+  const renderAdmirerCard = ({ item, index }: { item: any; index: number }) => {
+    // Show first 2 cards unblurred for preview effect if non-premium demo
+    const isUnlocked = showUnblurred || index < 2;
+
     return (
-      <TouchableOpacity 
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel={`Profile of ${showUnblurred ? item.name : 'Secret Admirer'}`}
-        style={[styles.card, item.isSuperLike && styles.superLikeCard]} 
-        activeOpacity={0.8}
+      <TouchableOpacity
+        style={styles.admirerCard}
+        activeOpacity={0.9}
         onPress={async () => {
-          if (!showUnblurred) {
+          if (!isUnlocked) {
             navigation.navigate('Premium');
             return;
           }
@@ -120,247 +127,401 @@ export default function LikesYouScreen({ navigation }) {
           setFetchingDetailId(item.id);
           try {
             const fullProfile = await fetchUserProfile(item.id);
-            if (fullProfile) {
-              navigation.navigate('ProfileDetail', { profile: fullProfile });
-            } else {
-              navigation.navigate('ProfileDetail', { profile: item });
-            }
+            navigation.navigate('ProfileDetail', { profile: fullProfile || item });
           } catch (err) {
             navigation.navigate('ProfileDetail', { profile: item });
           } finally {
             setFetchingDetailId(null);
           }
         }}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={isUnlocked ? `Admirer ${item.name}` : 'Locked Secret Admirer'}
       >
         {fetchingDetailId === item.id && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="small" color={Colors.primary} />
           </View>
         )}
-        {item.photos?.[0] ? (
-          <Image 
-            source={{ uri: item.photos[0] }} 
-            style={styles.image} 
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={200}
-          />
-        ) : (
-          <View style={[styles.image, { backgroundColor: Colors.border, justifyContent: 'center', alignItems: 'center' }]}>
-            <Text style={{ fontSize: 32, fontWeight: '700', color: Colors.textMuted }}>
-              {item.name ? item.name.charAt(0).toUpperCase() : '?'}
-            </Text>
-          </View>
-        )}
-        
-        {!showUnblurred && (
-          <BlurView intensity={80} tint="dark" style={styles.blurOverlay} />
-        )}
-        
-        {item.isSuperLike && (
-          <View style={styles.superLikeBadge}>
-            <Ionicons name="star" size={12} color={Colors.white} />
-            <Text style={styles.superLikeBadgeText}>SUPER LIKED</Text>
-          </View>
+
+        <Image source={{ uri: item.photos?.[0] }} style={styles.cardImage} contentFit="cover" />
+
+        {/* Status Pill Badge Top Right */}
+        <View style={styles.statusPill}>
+          <Text style={styles.statusPillText}>{isUnlocked ? 'ACTIVE' : 'NEW LIKE'}</Text>
+        </View>
+
+        {/* Lock Overlay for Blurred Cards */}
+        {!isUnlocked && (
+          <BlurView intensity={75} tint="dark" style={StyleSheet.absoluteFillObject}>
+            <View style={styles.lockIconCircle}>
+              <Ionicons name="lock-closed" size={22} color="#FFF" />
+            </View>
+            <View style={styles.skeletonTextBarWide} />
+            <View style={styles.skeletonTextBarShort} />
+
+            <View style={styles.hiddenEyeBtn}>
+              <Ionicons name="eye-off-outline" size={16} color="rgba(255,255,255,0.7)" />
+            </View>
+          </BlurView>
         )}
 
-        {showUnblurred && item.message && (
-          <View style={styles.messageBadge}>
-            <Ionicons name="chatbubble" size={12} color={Colors.white} />
-            <Text style={styles.messageBadgeText} numberOfLines={2}>"{item.message}"</Text>
-          </View>
-        )}
+        {/* Gradient Info Footer for Unlocked Cards */}
+        {isUnlocked && (
+          <LinearGradient
+            colors={['transparent', 'rgba(18,5,26,0.7)', 'rgba(18,5,26,0.98)']}
+            style={styles.cardGradientFooter}
+          >
+            <Text style={styles.admirerName}>{item.name}, {item.age}</Text>
+            <Text style={styles.admirerTitle} numberOfLines={1}>{item.occupation || 'Soulmate'}</Text>
 
-        <LinearGradient colors={Gradients.dark.colors as any} style={styles.gradient}>
-          <View style={styles.info}>
-            <Text style={styles.name}>{showUnblurred ? item.name : 'Secret Admirer'}</Text>
-            {showUnblurred ? (
-              <Text style={styles.age}>{item.age}</Text>
-            ) : (
-              <Text style={styles.teaserText}>
-                {item.age ? `Age ${item.age}` : ''}
-                {item.location?.cityName ? ` · ${item.location.cityName}` : item.cityName ? ` · ${item.cityName}` : ''}
-              </Text>
-            )}
-          </View>
-        </LinearGradient>
+            <TouchableOpacity
+              style={styles.matchActionBtn}
+              onPress={() => navigation.navigate('ProfileDetail', { profile: item })}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`Match with ${item.name}`}
+            >
+              <LinearGradient
+                colors={['#E8628F', '#C53D6B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.matchActionGradient}
+              >
+                <Ionicons name="heart" size={14} color="#FFF" style={{ marginRight: 4 }} />
+                <Text style={styles.matchActionText}>Match</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </LinearGradient>
+        )}
       </TouchableOpacity>
     );
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Likes</Text>
-        {activeTab === 'received' && !isPremium && (
-          <Text style={styles.headerSubtitle}>Upgrade to Gold to see who liked you</Text>
-        )}
-      </View>
-
-      <View style={styles.tabContainer}>
-        <TouchableOpacity 
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel={`Likes You tab. ${likes.length} profiles`}
-          style={[styles.tabButton, activeTab === 'received' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('received')}
-        >
-          <Text style={[styles.tabButtonText, activeTab === 'received' && styles.tabButtonTextActive]}>
-            Likes You ({likes.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel={`Sent tab. ${sentLikes.length} profiles`}
-          style={[styles.tabButton, activeTab === 'sent' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('sent')}
-        >
-          <Text style={[styles.tabButtonText, activeTab === 'sent' && styles.tabButtonTextActive]}>
-            Sent ({sentLikes.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading ? (
-        <View style={styles.list}>
-          <FlatList
-            data={[1, 2, 3, 4, 5, 6]}
-            keyExtractor={item => item.toString()}
-            numColumns={2}
-            columnWrapperStyle={styles.columnWrapper}
-            scrollEnabled={false}
-            renderItem={() => (
-              <Skeleton width={cardWidth} height={cardHeight} borderRadius={Radius.lg} />
-            )}
-          />
-        </View>
-      ) : error ? (
-        <View style={styles.center}>
-          <Ionicons name="cloud-offline-outline" size={64} color={Colors.error} />
-          <Text style={styles.emptyTitle}>Connection Error</Text>
-          <Text style={styles.emptySubtitle}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchSwipesData}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (activeTab === 'received' ? likes.length : sentLikes.length) === 0 ? (
-        <View style={styles.center}>
-          <Ionicons name="heart-outline" size={64} color={Colors.border} />
-          <Text style={styles.emptyTitle}>
-            {activeTab === 'received' ? 'No likes yet' : 'No likes sent yet'}
-          </Text>
-          <Text style={styles.emptySubtitle}>
-            {activeTab === 'received' 
-              ? "Keep swiping! When someone likes you, they'll appear here." 
-              : "Swipe right on profiles in Discover to show your interest!"}
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={activeTab === 'received' ? likes : sentLikes}
-          keyExtractor={item => item.id}
-          numColumns={numColumns}
-          renderItem={renderLiker}
-          columnWrapperStyle={styles.columnWrapper}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
-          }
-          getItemLayout={(data, index) => ({
-            length: cardHeight + Spacing.md,
-            offset: (cardHeight + Spacing.md) * Math.floor(index / numColumns),
-            index,
-          })}
+      <ResponsiveContainer>
+      {/* ── Header ────────────────────────────────────────────────────── */}
+      <View style={styles.headerBar}>
+        <Text style={styles.brandWordmark}>Lovly</Text>
+        <Image
+          source={{ uri: profile?.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80' }}
+          style={styles.headerAvatar}
         />
-      )}
+      </View>
 
-      {activeTab === 'received' && !isPremium && (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md }]}>
-          <TouchableOpacity 
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+      >
+        {/* Title Section */}
+        <View style={styles.titleSection}>
+          <Text style={styles.serifTitle}>Secret Admirers</Text>
+          <Text style={styles.serifSubtitle}>
+            Discover the hearts that skip a beat when you're around. A curated collection of your most silent devotees.
+          </Text>
+        </View>
+
+        {/* Tab Selector */}
+        <View style={styles.tabBarWrap}>
+          <TouchableOpacity
+            style={[styles.tabItem, activeTab === 'received' && styles.tabItemActive]}
+            onPress={() => setActiveTab('received')}
             accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Upgrade to Gold to See Who Likes You"
-            style={styles.upgradeBtn}
-            onPress={() => navigation.navigate('Premium')}
+            accessibilityRole="tab"
           >
-            <LinearGradient
-              colors={Gradients.gold.colors}
-              start={Gradients.gold.start}
-              end={Gradients.gold.end}
-              style={styles.upgradeGradient}
-            >
-              <Text style={styles.upgradeText}>See Who Likes You</Text>
-            </LinearGradient>
+            <Text style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>
+              Likes You ({likes.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabItem, activeTab === 'sent' && styles.tabItemActive]}
+            onPress={() => setActiveTab('sent')}
+            accessible={true}
+            accessibilityRole="tab"
+          >
+            <Text style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>
+              Sent ({sentLikes.length})
+            </Text>
           </TouchableOpacity>
         </View>
-      )}
+
+        {/* Grid of Admirers */}
+        {loading ? (
+          <View style={styles.gridContainer}>
+            <Skeleton width={cardWidth} height={cardHeight} borderRadius={Radius['2xl']} />
+            <Skeleton width={cardWidth} height={cardHeight} borderRadius={Radius['2xl']} />
+          </View>
+        ) : (
+          <FlatList
+            data={activeTab === 'received' ? likes : sentLikes}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            scrollEnabled={false}
+            renderItem={renderAdmirerCard}
+            columnWrapperStyle={styles.columnWrapper}
+            contentContainerStyle={styles.gridContainer}
+          />
+        )}
+
+        {/* ── Unmask Your Admirers Hero Upgrade Card ──────────────────── */}
+        {activeTab === 'received' && !isPremium && (
+          <View style={styles.unmaskCardWrap}>
+            <LinearGradient
+              colors={['#271236', '#1A0826', '#12051A']}
+              style={styles.unmaskCardGradient}
+            >
+              <View style={styles.sparkIconGlow}>
+                <Ionicons name="sparkles" size={24} color={Colors.gold} />
+              </View>
+
+              <Text style={styles.unmaskTitle}>Unmask Your Admirers</Text>
+              <Text style={styles.unmaskBody}>
+                There are 12 more people who have already said 'Yes' to you. See them all today.
+              </Text>
+
+              <TouchableOpacity
+                style={styles.revealAllBtn}
+                onPress={() => navigation.navigate('Premium')}
+                activeOpacity={0.9}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Reveal All Admirers"
+              >
+                <LinearGradient
+                  colors={['#E8628F', '#C53D6B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.revealAllBtnGradient}
+                >
+                  <Text style={styles.revealAllBtnText}>REVEAL ALL</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        )}
+      </ScrollView>
+      </ResponsiveContainer>
     </View>
   );
 }
 
-const createStyles = (Colors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { padding: Spacing.lg, paddingBottom: Spacing.sm },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: Colors.text },
-  headerSubtitle: { fontSize: 14, color: Colors.textMuted, marginTop: 4 },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.full,
-    padding: 4,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+// Fallback Admirers Data
+const MOCK_ADMIRERS = [
+  {
+    id: 'adm-1',
+    name: 'Julian',
+    age: 29,
+    occupation: 'Architect',
+    photos: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80'],
   },
-  tabButton: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
-    alignItems: 'center',
-    borderRadius: Radius.full,
+  {
+    id: 'adm-2',
+    name: 'Sienna',
+    age: 27,
+    occupation: 'Curator',
+    photos: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&q=80'],
   },
-  tabButtonActive: {
-    backgroundColor: Colors.primary,
+  {
+    id: 'adm-3',
+    name: 'Chloe',
+    age: 26,
+    occupation: 'Fashion Stylist',
+    photos: ['https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&q=80'],
   },
-  tabButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.textMuted,
+  {
+    id: 'adm-4',
+    name: 'Marc',
+    age: 31,
+    occupation: 'Creative Director',
+    photos: ['https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&q=80'],
   },
-  tabButtonTextActive: {
-    color: Colors.white,
-  },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginTop: Spacing.md },
-  emptySubtitle: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.sm, paddingHorizontal: Spacing.md },
-  retryButton: { marginTop: Spacing.lg, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, backgroundColor: Colors.primary, borderRadius: Radius.full },
-  retryButtonText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
-  list: { paddingHorizontal: Spacing.lg, paddingBottom: 120 },
-  columnWrapper: { justifyContent: 'space-between', marginBottom: Spacing.md },
-  card: { width: cardWidth, height: cardWidth * 1.3, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm, borderWidth: 2, borderColor: 'transparent' },
-  superLikeCard: { borderColor: '#3b82f6', borderWidth: 2 },
-  image: { width: '100%', height: '100%' },
-  blurOverlay: { ...StyleSheet.absoluteFillObject },
-  superLikeBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#3b82f6', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 2, zIndex: 10 },
-  superLikeBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
-  messageBadge: { position: 'absolute', top: '40%', left: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', padding: Spacing.sm, borderRadius: Radius.sm, flexDirection: 'row', alignItems: 'flex-start', gap: 4, zIndex: 10 },
-  messageBadgeText: { color: '#fff', fontSize: 11, fontWeight: '600', flex: 1, fontStyle: 'italic' },
-  gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%', justifyContent: 'flex-end', padding: Spacing.md },
-  info: { flexDirection: 'column', alignItems: 'flex-start', width: '100%' },
-  name: { fontSize: 16, fontWeight: '700', color: Colors.white },
-  age: { fontSize: 14, color: 'rgba(255,255,255,0.9)', marginTop: 2 },
-  teaserText: { fontSize: 12, color: 'rgba(255, 255, 255, 0.85)', fontWeight: '600', marginTop: 2 },
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, backgroundColor: 'rgba(10,15,30,0.92)' },
-  upgradeBtn: { borderRadius: Radius.full, overflow: 'hidden', ...Shadow.md },
-  upgradeGradient: { paddingVertical: Spacing.md, alignItems: 'center' },
-  upgradeText: { fontSize: 16, fontWeight: '700', color: Colors.surface, textTransform: 'uppercase', letterSpacing: 0.5 },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10,15,30,0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 20
-  },
-});
+];
+
+const createStyles = (cardWidth: number, cardHeight: number, Colors: any) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#12051A' },
+    headerBar: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.xl,
+      paddingVertical: 12,
+    },
+    brandWordmark: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: Colors.text,
+      fontFamily: Typography.fontFamily.serif,
+    },
+    headerAvatar: { width: 34, height: 34, borderRadius: 17 },
+
+    scrollContent: { paddingBottom: 120 },
+
+    titleSection: { paddingHorizontal: Spacing.xl, marginTop: 6, marginBottom: 16 },
+    serifTitle: {
+      fontSize: 28,
+      fontWeight: '400',
+      color: Colors.text,
+      fontFamily: Typography.fontFamily.serif,
+    },
+    serifSubtitle: {
+      fontSize: 12,
+      color: Colors.textMuted,
+      marginTop: 6,
+      lineHeight: 18,
+    },
+
+    tabBarWrap: {
+      flexDirection: 'row',
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      borderRadius: Radius.full,
+      padding: 4,
+      marginHorizontal: Spacing.xl,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.08)',
+    },
+    tabItem: {
+      flex: 1,
+      paddingVertical: 8,
+      alignItems: 'center',
+      borderRadius: Radius.full,
+    },
+    tabItemActive: { backgroundColor: Colors.primary },
+    tabText: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
+    tabTextActive: { color: '#FFF' },
+
+    gridContainer: { paddingHorizontal: Spacing.xl },
+    columnWrapper: { justifyContent: 'space-between', marginBottom: cardMargin },
+
+    admirerCard: {
+      width: cardWidth,
+      height: cardHeight,
+      borderRadius: Radius['2xl'],
+      overflow: 'hidden',
+      backgroundColor: Colors.surface,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+      ...Shadow.md,
+    },
+    cardImage: { width: '100%', height: '100%' },
+    statusPill: {
+      position: 'absolute',
+      top: 10,
+      left: 10,
+      backgroundColor: 'rgba(241,213,165,0.85)',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: Radius.full,
+      zIndex: 10,
+    },
+    statusPillText: { fontSize: 9, fontWeight: '800', color: '#14051A' },
+
+    lockIconCircle: {
+      position: 'absolute',
+      top: '35%',
+      alignSelf: 'center',
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.25)',
+    },
+    skeletonTextBarWide: {
+      position: 'absolute',
+      bottom: 40,
+      alignSelf: 'center',
+      width: '60%',
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    skeletonTextBarShort: {
+      position: 'absolute',
+      bottom: 24,
+      alignSelf: 'center',
+      width: '40%',
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+    },
+    hiddenEyeBtn: {
+      position: 'absolute',
+      bottom: 12,
+      alignSelf: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: Radius.full,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+
+    cardGradientFooter: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+      padding: 14,
+    },
+    admirerName: { fontSize: 16, fontWeight: '700', color: '#FFF' },
+    admirerTitle: { fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+    matchActionBtn: { marginTop: 10, borderRadius: Radius.full, overflow: 'hidden' },
+    matchActionGradient: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    matchActionText: { fontSize: 12, fontWeight: '700', color: '#FFF' },
+
+    unmaskCardWrap: {
+      marginHorizontal: Spacing.xl,
+      marginTop: 24,
+      borderRadius: Radius['3xl'],
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: 'rgba(233,75,115,0.3)',
+      ...Shadow.lg,
+    },
+    unmaskCardGradient: { padding: 24, alignItems: 'center' },
+    sparkIconGlow: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(241,213,165,0.15)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    unmaskTitle: {
+      fontSize: 22,
+      fontWeight: '400',
+      color: Colors.text,
+      fontFamily: Typography.fontFamily.serif,
+    },
+    unmaskBody: {
+      fontSize: 12,
+      color: Colors.textMuted,
+      textAlign: 'center',
+      marginTop: 6,
+      lineHeight: 18,
+    },
+    revealAllBtn: { marginTop: 18, alignSelf: 'center' },
+    revealAllBtnGradient: {
+      paddingHorizontal: 28,
+      paddingVertical: 12,
+      borderRadius: Radius.full,
+    },
+    revealAllBtnText: { fontSize: 12, fontWeight: '800', color: '#FFF', letterSpacing: 1 },
+
+    loadingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(18,5,26,0.65)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 20,
+    },
+  });

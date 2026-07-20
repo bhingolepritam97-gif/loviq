@@ -12,6 +12,8 @@ import BrandIcon from '../../components/brand/BrandIcon';
 import BrandLogo from '../../components/brand/BrandLogo';
 import { Brand } from '../../components/brand/brand';
 import { Skeleton } from '../../components/Skeleton';
+import { ResponsiveContainer, useBreakpoints } from '../../core/responsive';
+import ChatScreen from './ChatScreen';
 
 // Format countdown from deadline timestamp
 function formatCountdown(deadline) {
@@ -28,6 +30,19 @@ export default function MatchesInboxScreen({ navigation }) {
   const { colors: Colors } = useTheme();
   const styles = createStyles(Colors);
   const insets = useSafeAreaInsets();
+  const { isPhone } = useBreakpoints();
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<any>(null);
+
+  const handleChatSelect = (matchId: string, otherUser: any) => {
+    if (isPhone) {
+      navigation.navigate('Chat', { matchId, profile: otherUser });
+    } else {
+      setSelectedMatchId(matchId);
+      setSelectedProfile(otherUser);
+    }
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -102,7 +117,7 @@ export default function MatchesInboxScreen({ navigation }) {
             accessibilityRole="button"
             accessibilityLabel={`Chat with ${match.otherUser?.name || 'User'}`}
             style={styles.matchItem}
-            onPress={() => navigation.navigate('Chat', { matchId: match.id, profile: match.otherUser })}
+            onPress={() => handleChatSelect(match.id, match.otherUser)}
             activeOpacity={0.8}
           >
             {/* Unread gradient ring wrapper */}
@@ -152,8 +167,8 @@ export default function MatchesInboxScreen({ navigation }) {
     </View>
   );
 
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+  const renderInboxList = () => (
+    <View style={[styles.container, { paddingTop: isPhone ? insets.top : 0 }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -243,8 +258,8 @@ export default function MatchesInboxScreen({ navigation }) {
                 accessible={true}
                 accessibilityRole="button"
                 accessibilityLabel={`Chat with ${item.otherUser?.name || 'User'}`}
-                style={[styles.chatRow, isUnread && styles.unreadChatRow]}
-                onPress={() => navigation.navigate('Chat', { matchId: item.id, profile: item.otherUser })}
+                style={[styles.chatRow, isUnread && styles.unreadChatRow, selectedMatchId === item.id && styles.activeChatRow]}
+                onPress={() => handleChatSelect(item.id, item.otherUser)}
                 activeOpacity={0.7}
               >
                 <View style={styles.chatAvatarWrap}>
@@ -329,6 +344,35 @@ export default function MatchesInboxScreen({ navigation }) {
         />
       )}
     </View>
+  );
+
+  return (
+    <ResponsiveContainer safeArea={false} centered={false}>
+      {isPhone ? (
+        renderInboxList()
+      ) : (
+        <View style={styles.splitWrapper}>
+          <View style={styles.leftColumn}>
+            {renderInboxList()}
+          </View>
+          <View style={styles.rightColumn}>
+            {selectedMatchId ? (
+              <ChatScreen 
+                matchIdProp={selectedMatchId} 
+                profileProp={selectedProfile} 
+                navigation={navigation} 
+              />
+            ) : (
+              <View style={styles.emptyDetailContainer}>
+                <Ionicons name="chatbubbles-outline" size={64} color={Colors.textMuted} style={{ marginBottom: Spacing.md }} />
+                <Text style={styles.emptyDetailTitle}>Select a Conversation</Text>
+                <Text style={styles.emptyDetailSubtitle}>Choose a match from the list on the left to start real-time messaging.</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+    </ResponsiveContainer>
   );
 }
 
@@ -429,4 +473,11 @@ const createStyles = (Colors) => StyleSheet.create({
   exploreBtn: { marginTop: Spacing.xl, borderRadius: Radius['2xl'], overflow: 'hidden', ...Shadow.sm },
   exploreGradient: { paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md },
   exploreBtnText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
+  splitWrapper: { flex: 1, flexDirection: 'row', backgroundColor: Colors.background },
+  leftColumn: { width: 350, borderRightWidth: 1, borderRightColor: Colors.border },
+  rightColumn: { flex: 1, backgroundColor: Colors.background },
+  activeChatRow: { backgroundColor: 'rgba(232, 98, 143, 0.08)' },
+  emptyDetailContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing['2xl'], backgroundColor: Colors.background },
+  emptyDetailTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: Spacing.xs, fontFamily: Typography.fontFamily.serif },
+  emptyDetailSubtitle: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', maxWidth: 300, lineHeight: 20 },
 });

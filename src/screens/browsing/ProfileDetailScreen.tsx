@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, ActionSheetIOS, Platform, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActionSheetIOS, Platform, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
@@ -12,8 +12,7 @@ import { blockUser, reportUser } from '../../services/UserService';
 import { recordSwipe } from '../../services/DiscoverService';
 import { Ionicons } from '@expo/vector-icons';
 import { ReportModal } from '../../components/safety/ReportModal';
-
-const { width, height } = Dimensions.get('window');
+import { ResponsiveContainer, useBreakpoints } from '../../core/responsive';
 
 // Mock Deep Data if missing from profile
 const DEFAULT_PROMPTS = [
@@ -37,8 +36,9 @@ const DEFAULT_BASICS = [
 ];
 
 export default function ProfileDetailScreen({ route, navigation }) {
+  const { width, height, isPhone } = useBreakpoints();
   const { colors: Colors } = useTheme();
-  const styles = createStyles(Colors);
+  const styles = createStyles(width, height, Colors, isPhone);
   const insets = useSafeAreaInsets();
   const { profile } = route.params || {};
 
@@ -58,16 +58,17 @@ export default function ProfileDetailScreen({ route, navigation }) {
 
   if (!profile) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ResponsiveContainer>
+        <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.skeletonImageHeader} />
         <View style={styles.contentBody}>
           <View style={styles.skeletonSection}>
             <View style={styles.skeletonTitle} />
             <View style={styles.skeletonTextRow} />
-            <View style={styles.skeletonTextRowShort} />
           </View>
         </View>
       </View>
+      </ResponsiveContainer>
     );
   }
 
@@ -189,7 +190,8 @@ export default function ProfileDetailScreen({ route, navigation }) {
 
   return (
     <>
-      <View style={styles.container}>
+      <ResponsiveContainer>
+        <View style={styles.container}>
       <ScrollView 
         contentContainerStyle={styles.scroll} 
         showsVerticalScrollIndicator={false}
@@ -491,11 +493,14 @@ export default function ProfileDetailScreen({ route, navigation }) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      </ResponsiveContainer>
     </>
   );
 }
 
-const createStyles = (Colors) => StyleSheet.create({
+const createStyles = (width: number, height: number, Colors: any, isPhone: boolean) => {
+  const containerWidth = isPhone ? width : 480;
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { paddingBottom: 40 },
   photoContainer: { width: width, position: 'relative' },
@@ -570,7 +575,7 @@ const createStyles = (Colors) => StyleSheet.create({
 
   instaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   instaGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
-  instaPhoto: { width: (width - Spacing.xl * 2 - 16) / 3, height: (width - Spacing.xl * 2 - 16) / 3, borderRadius: Radius.md, backgroundColor: Colors.surface },
+  instaPhoto: { width: (containerWidth - Spacing.xl * 2 - 16) / 3, height: (containerWidth - Spacing.xl * 2 - 16) / 3, borderRadius: Radius.md, backgroundColor: Colors.surface },
 
   reportFooter: { paddingVertical: Spacing.xl, alignItems: 'center' },
   reportText: { fontSize: 14, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
@@ -656,3 +661,4 @@ const createStyles = (Colors) => StyleSheet.create({
   skeletonTextRow: { width: '100%', height: 16, borderRadius: Radius.sm, backgroundColor: Colors.border, marginBottom: Spacing.xs },
   skeletonTextRowShort: { width: '70%', height: 16, borderRadius: Radius.sm, backgroundColor: Colors.border },
 });
+}

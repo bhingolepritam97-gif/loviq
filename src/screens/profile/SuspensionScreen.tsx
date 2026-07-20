@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../config/firebase';
 import { submitAppeal } from '../../services/UserService';
+import { ResponsiveContainer } from '../../core/responsive';
 
 export default function SuspensionScreen() {
   const { colors: Colors } = useTheme();
@@ -54,6 +55,7 @@ export default function SuspensionScreen() {
   };
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
@@ -182,6 +184,7 @@ export default function SuspensionScreen() {
         )}
       </ScrollView>
     </KeyboardAvoidingView>
+    </ResponsiveContainer>
   );
 }
 

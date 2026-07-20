@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Typography, Spacing, Radius, Gradients } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ResponsiveContainer } from '../../core/responsive';
 
 export default function SuperLikeScreen({ navigation }) {
   const { colors: Colors } = useTheme();
@@ -11,7 +12,8 @@ export default function SuperLikeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <ResponsiveContainer>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Close screen" onPress={() => navigation.goBack()} style={styles.closeBtn}>
           <Text style={styles.closeText}>✕</Text>
@@ -69,6 +71,7 @@ export default function SuperLikeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
     </View>
+    </ResponsiveContainer>
   );
 }
 

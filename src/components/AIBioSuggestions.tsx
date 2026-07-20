@@ -22,6 +22,8 @@ import { Typography, Spacing, Radius, Shadow } from '../theme';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
+import { ResponsiveContainer } from '../core/responsive';
+
 export default function AIBioSuggestions({
   visible,
   onClose,
@@ -53,7 +55,8 @@ export default function AIBioSuggestions({
             accessibilityRole="button"
             accessibilityLabel="Content area"
           >
-            <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
+            <ResponsiveContainer safeArea={false} centered={true} maxWidth={540} style={styles.sheetContainer}>
+              <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
               {/* Grab handle */}
               <View style={styles.handle} />
 
@@ -130,6 +133,7 @@ export default function AIBioSuggestions({
                 </ScrollView>
               )}
             </View>
+          </ResponsiveContainer>
           </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>
@@ -142,6 +146,10 @@ const createStyles = (Colors) => StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(18, 32, 46, 0.5)',
     justifyContent: 'flex-end',
+  },
+  sheetContainer: {
+    justifyContent: 'flex-end',
+    width: '100%',
   },
   sheet: {
     backgroundColor: Colors.background,

@@ -22,6 +22,9 @@ router.get("/appeals", ctrl.getAppeals);
 router.post("/appeals/:id/resolve", ctrl.resolveAppeal);
 router.post("/run-cleaners", ctrl.runCleaners);
 router.get("/analytics", ctrl.getAnalytics);
+router.get("/moderation-logs", ctrl.getModerationLogs);
+router.post("/users/:id/shadow-ban", ctrl.shadowBanUser);
+router.post("/users/:id/strike", ctrl.issueStrike);
 
 module.exports = router;
 

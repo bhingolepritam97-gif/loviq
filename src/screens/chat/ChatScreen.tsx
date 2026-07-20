@@ -11,6 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { fetchMatchMessages, sendMessage, subscribeToMessages, updateTypingStatus, markMessagesAsRead, fetchIcebreakers } from '../../services/ChatService';
 import { socketService } from '../../api/socket';
 import { uploadImageToFirebase, pickImageFromLibrary, takePhotoWithCamera, requestCameraAndGalleryPermissions } from '../../services/ImageService';
+import { useBreakpoints } from '../../core/responsive';
 
 const ICEBREAKERS = [
   "What's your absolute go-to Sunday activity? ☀️",
@@ -19,14 +20,24 @@ const ICEBREAKERS = [
   "What's the best travel trip you've ever taken? 🏔️"
 ];
 
-export default function ChatScreen({ route, navigation }) {
+export default function ChatScreen({ route, navigation, matchIdProp, profileProp }: any) {
   const { colors: Colors } = useTheme();
   const styles = createStyles(Colors);
   const insets = useSafeAreaInsets();
-  const { matchId } = route.params || {};
-  const [profile, setProfile] = useState(route.params?.profile || null);
+  const { isPhone } = useBreakpoints();
+  const isEmbedded = !isPhone;
+
+  const matchId = matchIdProp || route?.params?.matchId;
+  const initialProfile = profileProp || route?.params?.profile;
+  const [profile, setProfile] = useState(initialProfile || null);
   const [messages, setMessages] = useState([]);
   const [icebreakers, setIcebreakers] = useState(ICEBREAKERS);
+
+  useEffect(() => {
+    if (initialProfile) {
+      setProfile(initialProfile);
+    }
+  }, [initialProfile]);
 
   useEffect(() => {
     if (matchId) {
@@ -120,6 +131,11 @@ export default function ChatScreen({ route, navigation }) {
 
   useEffect(() => {
     if (!matchId) return;
+
+    // Reset states for the new conversation to prevent flicker
+    setLoading(true);
+    setMessages([]);
+    setHasMoreMessages(true);
 
     let unsubscribe = () => {};
 
@@ -324,9 +340,11 @@ export default function ChatScreen({ route, navigation }) {
     >
       {/* Top Header */}
       <View style={styles.header}>
-        <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text} />
-        </TouchableOpacity>
+        {!isEmbedded && (
+          <TouchableOpacity accessible={true} accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity 
           accessible={true}
           accessibilityRole="button"

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ResponsiveContainer } from '../../core/responsive';
 import { Typography, Spacing, Radius } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,6 +53,7 @@ export default function ChatOptionsScreen({ route, navigation }) {
   };
 
   return (
+    <ResponsiveContainer safeArea={false}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
@@ -94,6 +96,7 @@ export default function ChatOptionsScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
     </View>
+    </ResponsiveContainer>
   );
 }
 

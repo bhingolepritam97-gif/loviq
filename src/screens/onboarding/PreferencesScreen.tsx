@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { trackOnboardingStep, trackOnboardingStepCompleted } from '../../utils/onboardingAnalytics';
 import { Typography, Spacing, Radius, Shadow, Gradients } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ResponsiveContainer, ResponsiveScreen, useBreakpoints } from '../../core/responsive';
 
 const INTERESTED_IN = [
   { key: 'Men', label: 'Men', icon: 'male' },
@@ -26,6 +27,7 @@ export default function PreferencesScreen({ navigation, route }) {
   const [interestedIn, setInterestedIn] = useState(null);
   const [intent, setIntent] = useState(null);
   const startTime = useRef(Date.now());
+  const { isPhone } = useBreakpoints();
 
   useEffect(() => {
     trackOnboardingStep('preferences');
@@ -42,16 +44,6 @@ export default function PreferencesScreen({ navigation, route }) {
     });
   };
 
-  const handleSkip = () => {
-    // Navigate using default fallbacks
-    trackOnboardingStepCompleted('preferences', Date.now() - startTime.current);
-    navigation.navigate('Interests', {
-      ...route.params,
-      interestedIn: interestedIn || 'Everyone',
-      intent: intent || 'not_sure',
-    });
-  };
-
   return (
     <View style={styles.container}>
       <LinearGradient 
@@ -61,31 +53,30 @@ export default function PreferencesScreen({ navigation, route }) {
         end={{ x: 0.8, y: 1 }}
       />
       
-      {/* Header with Wordmark and back emoji */}
-      <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressBarFill, { width: '66%' }]} />
+      <ResponsiveScreen keyboardAvoiding scrollable backgroundColor="transparent">
+        {/* Header with Wordmark and back */}
+        <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
+          <View style={styles.progressContainer}>
+            <View style={[styles.progressBarFill, { width: '66%' }]} />
+          </View>
+          <View style={styles.headerRow}>
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()} 
+              style={styles.backBtn}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              activeOpacity={0.7}
+            >
+              <Text style={styles.backEmoji}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Lovly</Text>
+            <View style={{ width: 44 }} />
+          </View>
         </View>
-        <View style={styles.headerRow}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            style={styles.backBtn}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Text style={styles.backEmoji}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Lovly</Text>
-          <View style={{ width: 44 }} />
-        </View>
-      </View>
 
-      <ScrollView 
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.mainWrapper}>
+        {/* Inner Form with Desktop support */}
+        <View style={styles.innerForm}>
           <View style={styles.titleRow}>
             <Text style={styles.titleRegular}>Who are you </Text>
             <Text style={styles.titleItalic}>looking for?</Text>
@@ -104,6 +95,7 @@ export default function PreferencesScreen({ navigation, route }) {
                   accessible={true}
                   accessibilityRole="button"
                   accessibilityLabel={`Show me ${option.label}`}
+                  activeOpacity={0.75}
                 >
                   <Ionicons 
                     name={option.icon as any} 
@@ -133,6 +125,7 @@ export default function PreferencesScreen({ navigation, route }) {
                   accessibilityRole="button"
                   accessibilityLabel={`Intent option: ${option.label}`}
                   accessibilityHint={option.desc}
+                  activeOpacity={0.75}
                 >
                   <View style={styles.cardInfo}>
                     <Text style={[styles.cardText, isSelected && styles.cardTextSelected]}>
@@ -156,45 +149,46 @@ export default function PreferencesScreen({ navigation, route }) {
           <Text style={styles.hint}>
             You can change these preferences anytime in settings.
           </Text>
-        </View>
 
-        {/* Bottom Action Area */}
-        <View style={styles.footer}>
-          {/* Sparkles Floating Assist Icon */}
-          <View style={styles.sparkleRow}>
-            <View style={{ flex: 1 }} />
-            <TouchableOpacity 
-              style={styles.sparkleBtn}
+          {/* Bottom Action Area */}
+          <View style={styles.footer}>
+            {/* Sparkles Floating Assist Icon */}
+            <View style={styles.sparkleRow}>
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity 
+                style={styles.sparkleBtn}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="AI Match Assist"
+                activeOpacity={0.75}
+              >
+                <Ionicons name="sparkles" size={18} color="#E8628F" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.continueButton, !isValid && styles.continueButtonDisabled]}
+              disabled={!isValid}
+              onPress={handleContinue}
+              activeOpacity={isValid ? 0.85 : 1}
               accessible={true}
               accessibilityRole="button"
-              accessibilityLabel="AI Match Assist"
+              accessibilityLabel="Continue to interests step"
+              accessibilityState={{ disabled: !isValid }}
             >
-              <Ionicons name="sparkles" size={18} color="#E8628F" />
+              <LinearGradient
+                colors={isValid ? ['#E8628F', '#C53D6B'] : ['#3A1E4A', '#3A1E4A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.continueGradient}
+              >
+                <Text style={styles.continueButtonText}>CONTINUE</Text>
+              </LinearGradient>
             </TouchableOpacity>
+            <Text style={styles.stepText}>Step 2 of 3</Text>
           </View>
-
-          <TouchableOpacity
-            style={[styles.continueButton, !isValid && styles.continueButtonDisabled]}
-            disabled={!isValid}
-            onPress={handleContinue}
-            activeOpacity={isValid ? 0.85 : 1}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Continue to interests step"
-            accessibilityState={{ disabled: !isValid }}
-          >
-            <LinearGradient
-              colors={isValid ? ['#E8628F', '#C53D6B'] : ['#3A1E4A', '#3A1E4A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.continueGradient}
-            >
-              <Text style={styles.continueButtonText}>CONTINUE</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <Text style={styles.stepText}>Step 2 of 3</Text>
         </View>
-      </ScrollView>
+      </ResponsiveScreen>
     </View>
   );
 }
@@ -208,6 +202,8 @@ const createStyles = (Colors) => StyleSheet.create({
     width: '100%',
     backgroundColor: 'transparent',
     zIndex: 10,
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   progressContainer: {
     height: 4,
@@ -222,7 +218,7 @@ const createStyles = (Colors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base,
+    paddingHorizontal: 24,
     height: 56,
   },
   backBtn: {
@@ -232,6 +228,7 @@ const createStyles = (Colors) => StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   headerTitle: {
     fontSize: 22,
@@ -244,15 +241,16 @@ const createStyles = (Colors) => StyleSheet.create({
     color: '#FFF0F3',
     lineHeight: 26,
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: Spacing.xl,
+
+  innerForm: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    paddingHorizontal: 24,
     paddingTop: Spacing.lg,
-    justifyContent: 'space-between',
+    paddingBottom: Spacing.xl,
   },
-  mainWrapper: {
-    flex: 1,
-  },
+
   titleRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -294,6 +292,7 @@ const createStyles = (Colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   pillSelected: {
     borderColor: '#E8628F',
@@ -324,6 +323,7 @@ const createStyles = (Colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   cardSelected: {
     borderColor: '#E8628F',
@@ -375,16 +375,19 @@ const createStyles = (Colors) => StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   continueButton: {
     width: '100%',
     borderRadius: Radius.full,
     overflow: 'hidden',
     ...Shadow.md,
+    ...Platform.select({ web: { cursor: 'pointer' } as any, default: {} })
   },
   continueButtonDisabled: {
     shadowOpacity: 0,
     elevation: 0,
+    ...Platform.select({ web: { cursor: 'default' } as any, default: {} })
   },
   continueGradient: {
     height: 52,

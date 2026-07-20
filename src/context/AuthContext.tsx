@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
-import { getUserProfile, updateUserProfile, savePushToken } from '../services/UserService';
+import { getUserProfile, updateUserProfile, savePushToken, ensureUserDocument } from '../services/UserService';
 import { registerForPushNotificationsAsync } from '../services/PushService';
 import { configureRevenueCat, Purchases } from '../services/RevenueCatService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -101,24 +101,41 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Only subscribe if auth is initialized successfully
     if (!auth) {
+      console.log('[AuthContext] ⚠️ Firebase not initialized — skipping auth listener.');
       setLoading(false);
       return;
     }
 
+    console.log('[AuthContext] 🔥 Firebase Initialized — starting auth state listener.');
+
     const safetyTimeout = setTimeout(() => {
       if (user && user.uid.startsWith('mock_')) return; // skip timeout warning if mock user is active
       setLoading(false);
-      console.warn('⚠️ Firebase auth initialization timed out. Proceeding...');
+      console.warn('[AuthContext] ⚠️ Firebase auth initialization timed out. Proceeding...');
     }, 6000);
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       clearTimeout(safetyTimeout);
       if (firebaseUser) {
+        console.log('[AuthContext] 🚀 Authentication Started — onAuthStateChanged fired.');
+        console.log('[AuthContext] ✅ Authentication Success — uid received:', firebaseUser.uid);
+        console.log('[AuthContext] 🔑 UID Received:', firebaseUser.uid);
+        // Bug Fix: Ensure users/{uid} exists in Firestore on every login (first login creates it)
+        ensureUserDocument(firebaseUser.uid, firebaseUser); // fire-and-forget, never blocks auth
+
+        // FIX Bug 1: Set loading=true immediately so AppNavigator shows spinner (not a flash
+        // of the wrong screen) while we fetch the profile from the backend.
+        // On cold-start loading is already true; on subsequent logins it was false — causing
+        // a 1-2 second flash of the BasicInfo onboarding screen.
+        setLoading(true);
+
         setUser(firebaseUser);
         setConnectionError(false);
         AnalyticsService.setUserId(firebaseUser.uid);
+        console.log('[Login] STEP 2: auth.currentUser.uid verified:', firebaseUser.uid);
         try {
           let userProfile = null;
+          console.log('[AuthContext] 📖 Firestore Read Started — fetching user profile from backend...');
 
           // 20-second timeout limit for fetching profile from Postgres (handles cold-starts)
           const fetchPromise = getUserProfile(firebaseUser.uid);
@@ -130,6 +147,12 @@ export const AuthProvider = ({ children }) => {
           let isBanError = false;
           try {
             userProfile = await Promise.race([fetchPromise, timeoutPromise]);
+            if (userProfile) {
+              console.log('[AuthContext] ✅ Firestore Read Success — profile loaded. profileComplete:', userProfile?.profileComplete, '| name:', userProfile?.name);
+              console.log('[AuthContext] 👤 Profile Loaded — uid:', firebaseUser.uid);
+            } else {
+              console.log('[AuthContext] ℹ️ Profile Created (new user) — no existing profile found. Will start onboarding.');
+            }
           } catch (fetchErr) {
             console.warn('Profile fetch timed out or failed:', fetchErr.message);
             if (fetchErr.message === 'banned') {
@@ -177,13 +200,35 @@ export const AuthProvider = ({ children }) => {
             }
           }
           
-          setProfile(userProfile);
+          if (userProfile?.profileComplete) {
+            try {
+              await AsyncStorage.setItem(`profileComplete_${firebaseUser.uid}`, 'true');
+            } catch (e) {
+              console.warn('[AuthContext] Failed to persist local profileComplete flag:', e);
+            }
+          }
+
+          // FIX: Do NOT overwrite a locally-completed profile with stale backend data.
+          // PhotoUploadScreen calls setProfile({...profileComplete:true}) right after the PATCH.
+          // onAuthStateChanged fires in parallel and would overwrite with profileComplete:false
+          // (the backend returns false until the DB write fully commits), causing an infinite spinner.
+          setProfile((currentProfile) => {
+            if (currentProfile?.profileComplete === true) {
+              console.log('[AuthContext] ⚡ Skipping profile overwrite — already complete in state (signup race guard).');
+              return currentProfile;
+            }
+            console.log('[AuthContext] ✅ Firestore Write Success — Auth store updated. profileComplete:', userProfile?.profileComplete);
+            return userProfile;
+          });
           setConnectionError(false);
           AnalyticsService.setUserProperties({
             isPremium: userProfile.isPremium ? 'true' : 'false',
             profileComplete: userProfile.profileComplete ? 'true' : 'false',
             gender: userProfile.gender || null,
           });
+          console.log('[AuthContext] 🧭 Navigation Started — profileComplete:', userProfile?.profileComplete, '→', userProfile?.profileComplete ? 'Discover' : 'Onboarding');
+          console.log('[AuthContext] ✅ Navigation Success — AppNavigator will render correct stack.');
+
 
           // Configure RevenueCat and check entitlement in the background
           if (userProfile) {
@@ -224,14 +269,16 @@ export const AuthProvider = ({ children }) => {
             });
           }
         } catch (error) {
-          console.warn("Error inside authStateChanged profile setup:", error.message);
+          console.error('[Login] FAILED — Error during profile setup:', error.code || '', error.message);
           setConnectionError(true);
         }
       } else {
+        console.log('[AuthContext] 🔓 Logout Success — onAuthStateChanged: user signed out, clearing state.');
         setUser(null);
         setProfile(null);
         setConnectionError(false);
       }
+      console.log('[AuthContext] ⏹️ setLoading(false) — spinner stopped.');
       setLoading(false);
     });
 
