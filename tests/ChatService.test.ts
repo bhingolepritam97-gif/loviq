@@ -34,7 +34,7 @@ describe('ChatService', () => {
 
       const result = await fetchMatchMessages('match-123', null, 20);
 
-      expect(apiClient).toHaveBeenCalledWith('/matches/match-123/messages?limit=20');
+      expect(apiClient).toHaveBeenCalledWith('/matches/match-123/messages?limit=20', { cache: true, ttl: 300000 });
       expect(result).toEqual([
         {
           id: '123',
